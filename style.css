@@ -98,7 +98,7 @@ body.public_index #footer {
 }
 
 #footer #footer-top .address-wrapper {
-  flex-wrap: none !important;
+  flex-wrap: nowrap !important;
   flex-direction: row !important;
 }
 
