@@ -75,6 +75,7 @@ body.public_index #block_5 {
   background-color: #1c1c1c !important;
   border: 0.5px solid #5b5b5b !important;
   border-left: none !important;
+  border-radius: 0px 4px 4px 0px !important;
 }
 
 #nav-outer {
