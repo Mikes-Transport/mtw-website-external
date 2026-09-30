@@ -232,5 +232,6 @@ body.public_index #content {
 }
 
 #content #body .carousel-wrapper {
-  width: 100%;
-} */
+  width: 100% !important;
+  flex: 0 0 100% !important;
+}
