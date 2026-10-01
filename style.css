@@ -234,4 +234,115 @@ body.public_index #content {
 #content #body .carousel-wrapper {
   width: 100% !important;
   flex: 0 0 100% !important;
+} */
+
+/* ============================================================
+   HOMEPAGE GALLERY
+   ------------------------------------------------------------
+   The theme runs #gallery_scroller_1 as one full-width nivoSlider,
+   so a visitor only ever sees a single image. load-css.js deals the
+   CMS slides across three independent sliders instead: one large down
+   the left, two stacked on the right.
+
+   ADJUSTMENTS
+     left/right split ..... grid-template-columns below (2fr 1fr is what
+                          makes the heights match now the gap is 0)
+     spacing .............. gap below
+     when it drops to 1 ... the 991px query at the end of this block
+     slide timing ........ PAUSE in load-css.js
+   ============================================================ */
+
+#gallery_1 .mtw-gallery {
+  display: grid;
+  /* No gap at all, and exactly 2 : 1. Together those make the three tiles
+     line up by construction at any width: every CMS gallery image is
+     1901x593, so a tile's height is width / 3.206. With columns L and R
+     where L = 2R, the left tile is L/3.206 tall and the two stacked right
+     tiles total 2 * (R/3.206) = 2 * (L/2)/3.206 = L/3.206. Identical, so
+     the bottoms meet with nothing to crop and nothing to overlap.
+
+     Any other ratio reintroduces a mismatch once the gap is zero. */
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: repeat(2, auto);
+  gap: 0;
+  width: 100%;
+  align-items: start;
+}
+
+/* one large slider on the left, two stacked on the right */
+#gallery_1 .mtw-gallery-slider:nth-child(1) { grid-area: 1 / 1 / 3 / 2; }
+#gallery_1 .mtw-gallery-slider:nth-child(2) { grid-area: 1 / 2 / 2 / 3; }
+#gallery_1 .mtw-gallery-slider:nth-child(3) { grid-area: 2 / 2 / 3 / 3; }
+
+#gallery_1 .mtw-gallery-slider {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: #f4f4f4;
+}
+
+/* the theme forces .nivoSlider to width:100%, which would make each
+   slider full-bleed and stack them, so override it per slider */
+#gallery_1 .mtw-gallery-slider .gallery_scroller,
+#gallery_1 .mtw-gallery-slider .nivoSlider {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#gallery_1 .mtw-gallery-slider .nivoSlider img {
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+}
+
+/* nivo hides the prev arrow and uses a 60px next chevron sized for the
+   old full-width slider - rein it in to suit the smaller tiles */
+#gallery_1 .mtw-gallery-slider .nivo-prevNav,
+#gallery_1 .mtw-gallery-slider .nivo-nextNav {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 26px !important;
+  height: 26px !important;
+  background: rgba(0, 0, 0, 0.35) !important;
+}
+
+#gallery_1 .mtw-gallery-slider .nivo-prevNav {
+  display: none !important;
+}
+
+#gallery_1 .mtw-gallery-slider .nivo-nextNav:before {
+  font-size: 20px !important;
+  color: #fff !important;
+}
+
+/* Drop back to a single full-width slider, one image at a time - the same
+   behaviour the theme's own mobile gallery has.
+
+   the script below does the matching half: at this width it moves every slide
+   into the one remaining slider rather than just hiding the other two, so
+   no slide becomes unreachable. MOBILE_MAX below must stay in step
+   with this 991px.
+
+   The theme hides .desktop-only below 992px in favour of #gallery_2, so in
+   practice this only bites if that is ever changed. It is here so the
+   gallery is correct on its own terms rather than leaning on the theme. */
+@media (max-width: 991px) {
+  #gallery_1 .mtw-gallery {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 0;
+  }
+
+  #gallery_1 .mtw-gallery-slider:nth-child(n) {
+    grid-area: auto;
+  }
+
+  /* only one slider exists here, but do not let a stray extra tile open a
+     gap if the JS has not run */
+  #gallery_1 .mtw-gallery.is-single .mtw-gallery-slider + .mtw-gallery-slider {
+    display: none;
+  }
 }
