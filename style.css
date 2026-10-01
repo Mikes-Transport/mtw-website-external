@@ -347,6 +347,7 @@ body.public_index #content {
   }
 }
 
-#clearance-right.carousel-wrapper .owl-carousel .owl-theme .layoutmanager-layout-component .layout_component_185 {
-  width: 100% !important;
+#homepage-promotion #clearance-right {
+ width: 100% !important;
+flex: 0 0 100% !important;
 }
