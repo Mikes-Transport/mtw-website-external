@@ -351,3 +351,158 @@ body.public_index #content {
  width: 100% !important;
 flex: 0 0 100% !important;
 }
+
+/* ============================================================
+   FOOTER
+   ------------------------------------------------------------
+   The rules above force #footer-top to display:grid with two 1fr
+   tracks, which is why it does not respond at all: a 1fr track floors
+   at its content's min-content width, so the address column refused to
+   shrink and pushed the whole grid to 1631px. Measured, the third
+   column sat 241px off the right edge at 1440 and the address column
+   was clipped to 81% of its content - the Christchurch and Australia
+   addresses were simply not visible.
+
+   Everything here is additive: the original rules stay exactly as they
+   are and these override them from below.
+
+   ADJUSTMENTS
+     when it stacks ....... the 991px query
+     address columns ...... the 30% in .address-wrapper > div
+     menu columns ......... the 2 in the 991px query
+   ============================================================ */
+
+/* minmax(0, 1fr) rather than 1fr - this is the actual fix. 1fr has an
+   automatic minimum of min-content, so the track could never be narrower
+   than the longest unbroken run of text inside it. */
+#footer-top {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+}
+
+#footer-top > * {
+  min-width: 0 !important;
+}
+
+/* The theme gives each address block 45% (135% of the row) and the rule
+   above forces flex-wrap: nowrap, so all three sat on one 1631px line.
+   30% each fits three across and lets them wrap if space runs out. */
+#footer #footer-top .address-wrapper {
+  flex-wrap: wrap !important;
+}
+
+#footer #footer-top .address-wrapper > div {
+  flex: 0 1 30% !important;
+  min-width: 0 !important;
+}
+
+/* the theme sets .footer-column { width: 22% } from 768px up, which fights
+   the grid tracks and leaves gaps */
+#footer div.footer-column {
+  width: auto !important;
+  margin-right: 0 !important;
+}
+
+/* #footer-subscribe and #footer-bottom are pulled out to width:100vw by
+   the theme, but their inner block carries a fixed 980/1170px width plus
+   padding, so it overhangs the viewport just above 992px */
+#footer-subscribe .inner,
+#footer-subscribe form,
+#footer-subscribe ._form-content {
+  max-width: 100% !important;
+}
+
+#footer-subscribe .inner {
+  box-sizing: border-box !important;
+}
+
+/* The menu in #footer-column2 lays out six columns totalling 1141px, which
+   cannot fit in a half-width footer track (max ~895px even at 1920). With
+   justify-self:start the column grew to its content and pushed
+   #footer-column3 off the right edge (241px at 1440); with stretch the menu
+   overflowed and collided with column 3 instead. So from 1200px up column 2
+   spans the full footer width and the menu keeps its six columns, and
+   column 3 drops to its own full-width row underneath. */
+@media (min-width: 1200px) {
+  #footer-top > div:nth-child(2) {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    justify-self: stretch !important;
+  }
+
+  #footer-top > div:nth-child(3) {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  body.public_index #footer {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  #footer-top > div:nth-child(2) {
+    margin-right: 24px !important;
+  }
+
+  #footer-column3 {
+    margin-left: 24px !important;
+  }
+}
+
+/* The rules above flow #menu_4 into six columns totalling 1141px. Column 2
+   spans the full footer from 1200px up, but the footer is still narrower
+   than 1141px until about 1240px of viewport (1141 plus the 50px padding
+   each side), so the six column layout clips the last few categories in
+   that band - 5 of them at exactly 1200px. Two up in normal flow keeps
+   every category reachable until the six columns genuinely fit. */
+@media (max-width: 1279px) {
+  #menu_2,
+  #menu_4 {
+    grid-auto-flow: row !important;
+    grid-template-rows: none !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    column-gap: 10px 20px !important;
+  }
+
+  #menu_4 {
+    margin-bottom: 20px !important;
+  }
+}
+
+@media (max-width: 991px) {
+  body.public_index #footer {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* one column: the two-track grid is unreadable at this width */
+  #footer-top {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #footer-top > div:nth-child(1),
+  #footer-top > div:nth-child(2),
+  #footer-top > div:nth-child(3) {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  #footer-top > div:nth-child(2) {
+    margin-right: 0 !important;
+  }
+
+  #footer-column3 {
+    margin-left: 0 !important;
+  }
+
+  /* addresses stack instead of sitting three across a narrow column */
+  #footer #footer-top .address-wrapper {
+    flex-direction: column !important;
+  }
+
+  #footer #footer-top .address-wrapper > div {
+    flex: 0 1 auto !important;
+    width: 100% !important;
+  }
+}
