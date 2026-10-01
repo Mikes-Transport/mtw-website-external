@@ -372,11 +372,35 @@ flex: 0 0 100% !important;
      menu columns ......... the 2 in the 991px query
    ============================================================ */
 
-/* minmax(0, 1fr) rather than 1fr - this is the actual fix. 1fr has an
-   automatic minimum of min-content, so the track could never be narrower
-   than the longest unbroken run of text inside it. */
+/* Layout: flex with wrapping, replacing the two fixed 1fr grid tracks.
+
+   The rules above force display:grid with two 1fr tracks. 1fr floors at
+   min-content, so the track could never be narrower than the longest
+   unbroken text run inside it: the address column pushed the grid to
+   1631px, the third column sat 241px off the right edge at 1440, and the
+   Christchurch and Australia addresses were clipped away entirely.
+
+   Flex-wrap does the job the grid could not. The products menu and the
+   site map keep their natural widths and share a row while there is room
+   for them - side by side, as they were - and the site map simply wraps
+   onto the next row by itself as the viewport narrows. No fixed breakpoint
+   decides that, so there is no width where they half-overlap. */
 #footer-top {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 15px !important;
+}
+
+/* logo and addresses always take a row of their own */
+#footer-top > div:nth-child(1) {
+  flex: 0 0 100% !important;
+}
+
+/* products + site map: side by side while they fit, wrap when they do not */
+#footer-top > div:nth-child(2),
+#footer-top > div:nth-child(3) {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
 }
 
 #footer-top > * {
@@ -395,13 +419,12 @@ flex: 0 0 100% !important;
   min-width: 0 !important;
 }
 
-/* the theme sets .footer-column { width: 22% } from 768px up, which fights
-   the grid tracks and leaves gaps */
+/* the theme sets .footer-column { width: 22% } from 768px up, which fought
+   the grid tracks and left gaps */
 #footer div.footer-column {
   width: auto !important;
   margin-right: 0 !important;
 }
-
 /* #footer-subscribe and #footer-bottom are pulled out to width:100vw by
    the theme, but their inner block carries a fixed 980/1170px width plus
    padding, so it overhangs the viewport just above 992px */
@@ -415,47 +438,11 @@ flex: 0 0 100% !important;
   box-sizing: border-box !important;
 }
 
-/* The menu in #footer-column2 lays out six columns totalling 1141px, which
-   cannot fit in a half-width footer track (max ~895px even at 1920). With
-   justify-self:start the column grew to its content and pushed
-   #footer-column3 off the right edge (241px at 1440); with stretch the menu
-   overflowed and collided with column 3 instead. So from 1200px up column 2
-   spans the full footer width and the menu keeps its six columns, and
-   column 3 drops to its own full-width row underneath. */
-@media (min-width: 1200px) {
-  #footer-top > div:nth-child(2) {
-    grid-column: 1 / -1 !important;
-    grid-row: 2 !important;
-    justify-self: stretch !important;
-  }
-
-  #footer-top > div:nth-child(3) {
-    grid-column: 1 / -1 !important;
-    grid-row: 3 !important;
-  }
-}
-
-@media (max-width: 1199px) {
-  body.public_index #footer {
-    padding-left: 24px !important;
-    padding-right: 24px !important;
-  }
-
-  #footer-top > div:nth-child(2) {
-    margin-right: 24px !important;
-  }
-
-  #footer-column3 {
-    margin-left: 24px !important;
-  }
-}
-
-/* The rules above flow #menu_4 into six columns totalling 1141px. Column 2
-   spans the full footer from 1200px up, but the footer is still narrower
-   than 1141px until about 1240px of viewport (1141 plus the 50px padding
-   each side), so the six column layout clips the last few categories in
-   that band - 5 of them at exactly 1200px. Two up in normal flow keeps
-   every category reachable until the six columns genuinely fit. */
+/* The six column products menu is 1141px wide. It only fits beside the site
+   map once the footer is wide enough for both, and flex-wrap handles that
+   on its own. What it cannot do is sit in a half width column, so below the
+   width where the pair genuinely fits it goes two-up in normal flow - which
+   also stops the last few categories being clipped at 1200-1279px. */
 @media (max-width: 1279px) {
   #menu_2,
   #menu_4 {
@@ -476,16 +463,11 @@ flex: 0 0 100% !important;
     padding-right: 16px !important;
   }
 
-  /* one column: the two-track grid is unreadable at this width */
-  #footer-top {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
-  #footer-top > div:nth-child(1),
+  /* everything on its own row: the two-up menus are wide enough on their
+     own, and flex-wrap will not pair them below this anyway */
   #footer-top > div:nth-child(2),
   #footer-top > div:nth-child(3) {
-    grid-column: 1 !important;
-    grid-row: auto !important;
+    flex: 0 0 100% !important;
   }
 
   #footer-top > div:nth-child(2) {

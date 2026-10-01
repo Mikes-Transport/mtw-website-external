@@ -58,15 +58,21 @@
   }
 
   /* Pull href + image out of a theme slide. The theme lazy-loads images
-     with data-src and hides all but the first, so prefer data-src. */
-  function readSlide(a) {
-    var img = a.querySelector('img');
+     with data-src and hides all but the first, so prefer data-src.
+
+     A slide is not always a link: the CMS also emits a bare <img> with no
+     wrapping <a> when an image has no destination set. Reading only
+     anchors silently dropped those - an unlinked item added to the
+     gallery just never appeared. Handle both shapes. */
+  function readSlide(el) {
+    var img = el.tagName === 'IMG' ? el : el.querySelector('img');
     if (!img) return null;
     var src = img.getAttribute('data-src') || img.getAttribute('src') || '';
     if (!src) return null;
     return {
-      href: a.getAttribute('href') || '',
+      href: el.tagName === 'A' ? (el.getAttribute('href') || '') : '',
       src: src,
+      file: fileName(src),
       alt: img.getAttribute('alt') || '',
       title: img.getAttribute('title') || ''
     };
@@ -116,6 +122,98 @@
     });
   }
 
+  /* Which slide goes in which tile.
+
+     Return an array of SPLITTERS arrays of slides. Index 0 is the large
+     tile down the left, 1 and 2 are the two stacked on the right.
+
+     BIG_PINS: name the images you want in the large tile, in the order you
+       want them to appear. Currently the first three in the CMS list:
+
+         item-153  spin the wheel
+         item-147  Hella bluetooth speaker
+         item-148  Hella rugby ball
+
+       Those go to the large tile in this order. Everything else is dealt
+       out to the two small tiles. Filenames are the ones in the CMS
+       (gallery-images/item-153.jpg), not positions, so this survives
+       reordering - but a newly uploaded image falls through to a small
+       tile unless it is added here.
+
+       A name that no longer matches anything is reported in the console
+       rather than silently ignored.
+
+     Leave BIG_PINS empty for 'roundRobin': deal the CMS order out in
+       turn, so consecutive images never share a tile. Position 1, 4, 7 go
+       to the large tile, 2 and 5 to the top right, 3 and 6 to the bottom.
+     'bigFirst' gives the large tile the first half of the list instead. */
+  var BIG_PINS = ['item-153.jpg', 'item-147.jpg', 'item-148.jpg'];
+
+  var DEAL = 'roundRobin';
+
+  /* Pull the real filename out of the resize URL, which is base64 JSON:
+     .../<base64>  ->  {"key":"modtransnz/gallery-images/item-153.jpg"} */
+  function fileName(src) {
+    var tail = src.split('/').pop();
+    var b64 = tail.replace(/\.[a-z0-9]+$/i, '');
+    try {
+      var json = JSON.parse(window.atob(b64));
+      var key = (json && json.key) || '';
+      var parts = key.split('/');
+      return parts[parts.length - 1] || tail;
+    } catch (e) {
+      return tail;
+    }
+  }
+
+  function dealPinned(slides) {
+    var pool = slides.slice();
+    var pinned = [];
+    var i, j;
+
+    for (i = 0; i < BIG_PINS.length; i++) {
+      var want = BIG_PINS[i];
+      var found = false;
+      for (j = 0; j < pool.length; j++) {
+        if (pool[j].file === want) {
+          pinned.push(pool[j]);
+          pool.splice(j, 1);
+          found = true;
+          break;
+        }
+      }
+      if (!found && window.console && console.warn) {
+        console.warn('[gallery] BIG_PINS: no image named "' + want + '"');
+      }
+    }
+
+    var groups = [pinned];
+    for (i = 1; i < SPLITTERS; i++) groups.push([]);
+    var smalls = SPLITTERS - 1;
+    for (i = 0; i < pool.length; i++) groups[1 + (i % smalls)].push(pool[i]);
+    return groups;
+  }
+
+  function deal(slides) {
+    var groups = [], i, n;
+
+    if (BIG_PINS && BIG_PINS.length) return dealPinned(slides.slice());
+
+    if (DEAL === 'bigFirst') {
+      var half = Math.ceil(slides.length / 2);
+      groups.push(slides.slice(0, half));
+      for (i = 1; i < SPLITTERS; i++) groups.push([]);
+      var rest = slides.slice(half);
+      var smalls = SPLITTERS - 1;
+      for (i = 0; i < rest.length; i++) groups[1 + (i % smalls)].push(rest[i]);
+      return groups;
+    }
+
+    for (i = 0; i < SPLITTERS; i++) groups.push([]);
+    for (n = 0; n < slides.length; n++) groups[n % SPLITTERS].push(slides[n]);
+    return groups;
+  }
+
   function render() {
     var wrapper = document.querySelector(WRAPPER);
     if (!wrapper || !captured || !captured.length) return false;
@@ -123,16 +221,12 @@
     var narrow = isMobile();
     teardown();
 
-    var groups = [];
+    var groups;
     if (narrow) {
       /* every slide into the single slider, so nothing is lost */
       groups = [captured.slice()];
     } else {
-      /* round-robin so consecutive slides land in different sliders */
-      for (var i = 0; i < SPLITTERS; i++) groups.push([]);
-      captured.forEach(function (slide, i) {
-        groups[i % SPLITTERS].push(slide);
-      });
+      groups = deal(captured);
     }
 
     wrapper.innerHTML = '';
