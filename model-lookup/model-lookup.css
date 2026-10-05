@@ -1,0 +1,643 @@
+/* ------------------------------------------------------------------------
+   Model lookup - styles
+
+   Values taken from the "Trailer Lookup Light" reference artboard, with the
+   sizing pulled in afterwards - the first pass was proportionally oversized
+   and read as a prototype rather than a shop.
+
+   Palette, straight from the reference:
+
+     page        #eef1f5      ink        #12171f      muted       #5b6678
+     accent      #5ab0ff      on-accent  #07111f      card        #ffffff
+     card line   #dde3ea      sunken     #f1f4f8      field       #f7f9fb
+     field line  #cfd7e0      chip       #e8edf3      chip ink    #3b4656
+     mono ink    #3d5a80      in #15803d  low #b45309  out #b91c1c
+
+   Type: Manrope for UI, JetBrains Mono for stock codes, both loaded by the
+   script.
+
+   Every rule is prefixed .mtw-ml- so nothing reaches the theme's own tables,
+   buttons or Bootstrap 3 classes.
+   ------------------------------------------------------------------------ */
+
+.mtw-ml {
+  --ml-ink: #12171f;
+  --ml-muted: #5b6678;
+  --ml-accent: #5ab0ff;
+  --ml-line: #dde3ea;
+  --ml-line-2: #cfd7e0;
+  --ml-sunken: #f1f4f8;
+  --ml-field: #f7f9fb;
+  --ml-mono: #3d5a80;
+
+  margin: 0;
+  color: var(--ml-ink);
+  font-size: 14px;
+}
+
+.mtw-ml * { box-sizing: border-box; }
+
+.mtw-ml__loading,
+.mtw-ml__empty,
+.mtw-ml__error {
+  padding: 28px;
+  text-align: center;
+  color: var(--ml-muted);
+  background: #ffffff;
+  border: 1px dashed var(--ml-line-2);
+  border-radius: 12px;
+}
+.mtw-ml__error { border-style: solid; border-color: #f0c4c4; color: #b91c1c; background: #fdf2f2; }
+
+/* --- search ------------------------------------------------------------ */
+
+.mtw-ml__search { display: flex; gap: 8px; margin: 0 0 14px; }
+
+/* No wrapper border. The field itself carries the outline, and an outer
+   border too is what produced the stray line above the search bar. */
+.mtw-ml__search-field {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--ml-field);
+  border: 1px solid var(--ml-line-2);
+  border-radius: 8px;
+}
+.mtw-ml__search-field:focus-within { border-color: var(--ml-accent); }
+.mtw-ml__search-icon { flex: 0 0 auto; width: 17px; height: 17px; color: var(--ml-muted); }
+
+.mtw-ml__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--ml-ink);
+  font-family: inherit;
+  font-size: 14px;
+}
+.mtw-ml__search input::placeholder { color: var(--ml-muted); }
+
+/* Two buttons on one screen, both solid blue with heavy rounding, read as
+   decoration. Search is the quiet one - dark, compact, no fill - so the only
+   filled control on the page is the one that commits to something.
+
+   Square corners. The theme's own `button` rules were restoring a radius and
+   a border behind this, which is what made them look pasted on. */
+.mtw-ml__search button,
+.mtw-ml__add {
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mtw-ml__search button {
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 0 18px;
+  background: #12171f;
+  color: #ffffff;
+}
+.mtw-ml__search button:hover { background: #2a323d; }
+
+.mtw-ml__add {
+  height: 44px;
+  padding: 0 22px;
+  background: var(--ml-accent);
+  color: #07111f;
+}
+.mtw-ml__add:hover:not(:disabled) { background: #46a6f5; }
+.mtw-ml__add:disabled { background: #eef1f5; color: #aab4c2; cursor: not-allowed; }
+.mtw-ml__add.is-done { background: #4ade80; }
+
+/* --- result card -------------------------------------------------------- */
+
+.mtw-ml__panel {
+  background: #ffffff;
+  border: 1px solid var(--ml-line);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.mtw-ml__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 14px;
+}
+.mtw-ml__eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ml-muted);
+}
+.mtw-ml__head-title {
+  font-size: 19px;
+  font-weight: 800;
+  margin: 2px 0 0;
+  line-height: 1.2;
+}
+.mtw-ml__code-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #e8edf3;
+  color: #3b4656;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* --- two-column split ---------------------------------------------------- */
+
+/* Diagram left, information right. Flex rather than grid so each column
+   keeps its own height instead of both stretching to the taller one. */
+.mtw-ml__split {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.mtw-ml__viewer {
+  position: relative;
+  background: var(--ml-sunken);
+  border: 1px solid #e3e8ee;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.mtw-ml__svg { display: block; width: 100%; height: auto; }
+
+/* A small card tucked into the corner of the drawing, not a panel across
+   the bottom of it. Bounded on both axes and scrollable, so a component with
+   eight spec rows cannot swallow the trailer it is describing. */
+.mtw-ml__float {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: min(58%, 280px);
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--ml-line);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(18, 23, 31, 0.1);
+  scrollbar-width: thin;
+  scrollbar-color: #cfd7e0 transparent;
+  animation: mtw-ml-rise 0.2s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.mtw-ml__float[hidden] { display: none; }
+.mtw-ml__float::-webkit-scrollbar { width: 7px; }
+.mtw-ml__float::-webkit-scrollbar-track { background: transparent; }
+.mtw-ml__float::-webkit-scrollbar-thumb {
+  background: #cfd7e0; border: 2px solid transparent;
+  background-clip: content-box; border-radius: 8px;
+}
+
+@keyframes mtw-ml-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.mtw-ml__float-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: 0 22px 7px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ml-line);
+}
+.mtw-ml__float-sub { font-size: 12px; color: var(--ml-muted); margin: 0; }
+.mtw-ml__float .mtw-ml__spec { padding: 4px 0; }
+.mtw-ml__float .mtw-ml__spec dt { flex-basis: 46%; font-size: 11.5px; }
+.mtw-ml__float .mtw-ml__spec dd { font-size: 11.5px; }
+.mtw-ml__float-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ml-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mtw-ml__float-close:hover { background: var(--ml-sunken); color: var(--ml-ink); }
+
+/* --- diagram strokes ----------------------------------------------------- */
+
+.mtw-ml__line { stroke: #aab4c2; stroke-width: 2; }
+.mtw-ml__line--rail { stroke: var(--ml-accent); stroke-width: 4; }
+.mtw-ml__line--drawbar { stroke: var(--ml-accent); stroke-width: 3; }
+.mtw-ml__line--rib { stroke: #dde3ea; stroke-width: 2; }
+.mtw-ml__line--divider { stroke: var(--ml-line-2); stroke-width: 2; }
+.mtw-ml__line--ground { stroke: #dde3ea; stroke-width: 2; }
+.mtw-ml__line--leg { stroke: var(--ml-muted); stroke-width: 3; }
+
+.mtw-ml__body { fill: #f7f9fb; stroke: #aab4c2; stroke-width: 2; }
+.mtw-ml__flag { fill: #f87171; }
+.mtw-ml__hitch { fill: var(--ml-sunken); stroke: var(--ml-muted); stroke-width: 2; }
+.mtw-ml__wheel { fill: #ffffff; stroke: var(--ml-ink); stroke-width: 2.5; }
+.mtw-ml__hub { fill: var(--ml-accent); }
+
+/* Highlighted span on the rail, from the reference drawing. */
+.mtw-ml__highlight { stroke: #fbbf24; stroke-width: 4; }
+
+/* --- hotspot markers ----------------------------------------------------- */
+
+.mtw-ml__hot {
+  cursor: pointer;
+  fill: var(--ml-accent);
+  stroke: #ffffff;
+  stroke-width: 2;
+  transition: fill 0.15s ease;
+}
+.mtw-ml__hot:hover { fill: #46a6f5; }
+.mtw-ml__hot.is-active { fill: var(--ml-ink); filter: drop-shadow(0 0 5px rgba(90, 176, 255, 0.9)); }
+
+.mtw-ml__hot-group.is-empty .mtw-ml__hot { fill: #ffffff; stroke: var(--ml-line-2); stroke-width: 1.5; }
+.mtw-ml__hot-group.is-empty.is-active .mtw-ml__hot { fill: #ffffff; stroke: var(--ml-muted); stroke-width: 2.5; }
+
+/* A short tick from the active dot down toward the card. Not an arrowhead -
+   it marks the direction without decorating the drawing. */
+.mtw-ml__leader {
+  fill: none;
+  stroke: var(--ml-ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.mtw-ml__leader.is-drawn {
+  opacity: 0.7;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: mtw-ml-draw 0.28s ease forwards;
+}
+@keyframes mtw-ml-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mtw-ml__hot, .mtw-ml__leader { transition: none; }
+  .mtw-ml__leader.is-drawn { animation: none; stroke-dashoffset: 0; }
+  .mtw-ml__float { animation: none; }
+}
+
+/* --- information column --------------------------------------------------- */
+
+/* No accordion. It was a disclosure over content that is always wanted, and
+   it cost a click and a header row for nothing. This is just a scrollable
+   panel beside the drawing. */
+/* flex, not grid: a grid row stretches both columns to the taller one, which
+   left a gap under the drawing whenever the build sheet ran long. Each column
+   then takes its own natural height. */
+.mtw-ml__split {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.mtw-ml__split > * { flex: 1 1 0; min-width: 0; }
+
+.mtw-ml__side {
+  display: flex;
+  flex-direction: column;
+  background: var(--ml-field);
+  border: 1px solid var(--ml-line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mtw-ml__side-title {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ml-line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ml-muted);
+}
+
+/* Height is driven from the drawing, so the two columns always line up and
+   the page never jumps. Set on mount rather than guessed here, because the
+   drawing's height depends on the trailer type. */
+.mtw-ml__more-body {
+  max-height: var(--ml-side-max, 380px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  padding: 10px 12px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #cfd7e0 transparent;
+}
+.mtw-ml__more-body[hidden] { display: none; }
+.mtw-ml__more-body::-webkit-scrollbar { width: 7px; }
+.mtw-ml__more-body::-webkit-scrollbar-track { background: transparent; }
+.mtw-ml__more-body::-webkit-scrollbar-thumb {
+  background: #cfd7e0;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 8px;
+}
+.mtw-ml__more-body::-webkit-scrollbar-thumb:hover { background: #aab4c2; background-clip: content-box; }
+
+/* --- spec tiles ----------------------------------------------------------- */
+
+.mtw-ml__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.mtw-ml__fact { background: #ffffff; border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.mtw-ml__fact dt { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ml-muted); margin: 0; }
+.mtw-ml__fact dd { font-size: 13px; font-weight: 700; margin: 2px 0 0; word-break: break-word; }
+
+/* Nothing recorded for this field, rather than a placeholder pretending to be
+   data. */
+.mtw-ml__fact--empty dd { color: #aab4c2; font-weight: 500; }
+
+/* --- build sheet ---------------------------------------------------------- */
+
+.mtw-ml__spec {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ml-line);
+}
+.mtw-ml__spec:first-of-type { border-top: 0; }
+.mtw-ml__spec dt { flex: 0 0 42%; font-size: 12px; font-weight: 600; color: var(--ml-muted); margin: 0; }
+.mtw-ml__spec dd { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; margin: 0; word-break: break-word; }
+
+/* --- parts heading + grid --------------------------------------------------- */
+
+/* --- status line ------------------------------------------------------------ */
+
+/* Only appears while parts are resolving, so it is deliberately quiet and
+   has no margin that would shift the layout. */
+.mtw-ml__lookup-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ml-muted);
+}
+
+.mtw-ml__cards-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 20px 0 10px;
+  padding: 0 2px;
+}
+.mtw-ml__cards-title { font-size: 15px; font-weight: 800; margin: 0; }
+.mtw-ml__cards-count { font-size: 12px; font-weight: 600; color: var(--ml-muted); }
+
+.mtw-ml__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 12px;
+  /* Equal-height rows. Without this each card sizes to its own name length and
+     price/qty/stock sit at a different height in every column, which was the
+     ragged edge across the grid. The spacer inside does the work now, so the
+     rows can stretch freely. */
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
+
+.mtw-ml__card {
+  position: relative;
+  height: 100%;
+  background: #ffffff;
+  border: 1px solid var(--ml-line);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mtw-ml__card:hover { border-color: var(--ml-line-2); box-shadow: 0 4px 12px rgba(18, 23, 31, 0.06); }
+
+.mtw-ml__card-link { position: absolute; inset: 0; z-index: 1; border-radius: 12px; }
+
+/* White, not the sunken grey - a grey block under every product made the
+   grid read as heavier than it is. */
+.mtw-ml__card-media {
+  height: 118px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mtw-ml__card-media img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.mtw-ml__card-media--none { color: #c3cbd4; }
+.mtw-ml__card-media--none svg { width: 34px; height: 34px; }
+
+/* flex:1 on the body so it fills the stretched card, and the spacer inside
+   then pushes price/stock/qty to the bottom edge. */
+.mtw-ml__card-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 7px; padding: 0 2px; }
+
+.mtw-ml__card-fill { flex: 1 1 auto; min-height: 6px; }
+
+.mtw-ml__card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mtw-ml__card-code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ml-mono);
+}
+.mtw-ml__card-rrp { font-size: 11px; color: #aab4c2; text-decoration: line-through; }
+
+.mtw-ml__card-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+  /* No min-height: the spacer below does the aligning, so a long name grows
+     the card instead of reserving four lines of empty space. */
+}
+
+.mtw-ml__card-price { font-size: 16px; font-weight: 800; line-height: 1.1; }
+.mtw-ml__card-price small { font-size: 10px; font-weight: 600; color: var(--ml-muted); }
+
+/* Out of stock: dim the card so it reads as unavailable at a glance without
+   hiding it - the part may come back in. */
+.mtw-ml__card--out .mtw-ml__card-media { opacity: 0.45; }
+.mtw-ml__card--out .mtw-ml__card-name { color: #8b939d; }
+
+.mtw-ml__card-foot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+.mtw-ml__card-stock { flex: 1 1 auto; min-width: 0; }
+
+/* --- stock pill ------------------------------------------------------------ */
+
+.mtw-ml__stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mtw-ml__stock::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.mtw-ml__stock--in { color: #15803d; }
+.mtw-ml__stock--low { color: #b45309; }
+.mtw-ml__stock--out { color: #b91c1c; }
+
+/* --- stepper --------------------------------------------------------------- */
+
+/* Transparent throughout - no container fill, no outline, no separators. The
+   only thing that ever gets a border is the focus ring, which is what the
+   dotted box round the "0" was. */
+.mtw-ml__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 26px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+.mtw-ml__step:focus-within { outline: 2px solid var(--ml-accent); outline-offset: 3px; }
+
+.mtw-ml__step-btn {
+  width: 20px !important;
+  min-width: 20px !important;
+  height: 24px !important;
+  flex: 0 0 20px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ml-muted);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.mtw-ml__step-btn:hover:not(:disabled) { color: var(--ml-ink); }
+.mtw-ml__step-btn:disabled { color: #ccd3db; cursor: not-allowed; }
+
+/* Transparent number box.
+
+   The `!important`s are not defensive padding. The theme applies a border and
+   a white background to every `input` through a selector more specific than
+   any single class, so a plain class rule loses and the number ends up in a
+   little box that looks nothing like the control around it. Confirmed by
+   measuring: the same declaration without `!important` left a 1px border,
+   and the identical declaration inline with `!important` removed it. */
+.mtw-ml__step-input {
+  width: 26px !important;
+  min-width: 20px !important;
+  height: 24px !important;
+  flex: 0 0 26px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--ml-ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.mtw-ml__step-input::-webkit-outer-spin-button,
+.mtw-ml__step-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.mtw-ml__step-input:focus { outline: 0; }
+.mtw-ml__step-input:disabled { color: #ccd3db; }
+
+/* --- selection bar ---------------------------------------------------------- */
+
+/* Shrinks to its contents. A full-width bar for two short pieces of text and
+   one button made the page look like it was still loading. */
+.mtw-ml__bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 8px 10px 8px 14px;
+  background: #ffffff;
+  border: 1px solid var(--ml-line);
+  border-radius: 10px;
+}
+/* Block-level, so the label sits above the total instead of running into
+   it. The theme's flex rules were collapsing them onto one line. */
+.mtw-ml__bar-info { flex: 1 1 auto; min-width: 0; }
+
+/* Two spans inside one line: item count, then the money. */
+.mtw-ml__bar-count, .mtw-ml__bar-value { display: inline; }
+.mtw-ml__bar-value { color: var(--ml-muted); font-weight: 700; }
+
+.mtw-ml__bar-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ml-muted);
+}
+.mtw-ml__bar-total {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+/* --- narrow screens ---------------------------------------------------------- */
+
+/* --- narrow screens ---------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .mtw-ml__split { flex-direction: column; }
+  .mtw-ml__split > * { width: 100%; }
+  .mtw-ml__more-body { max-height: 300px; }
+}
+
+@media (max-width: 560px) {
+  .mtw-ml__panel { padding: 12px; border-radius: 12px; }
+  .mtw-ml__search { flex-wrap: wrap; }
+  .mtw-ml__search-field { flex-basis: 100%; }
+  .mtw-ml__search button { width: 100%; }
+  .mtw-ml__head-title { font-size: 17px; }
+  .mtw-ml__cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .mtw-ml__card-media { height: 96px; }
+  .mtw-ml__bar { flex-direction: column; align-items: stretch; }
+  .mtw-ml__add { width: 100%; }
+}
