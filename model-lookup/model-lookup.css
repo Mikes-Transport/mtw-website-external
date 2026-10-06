@@ -20,6 +20,11 @@
    buttons or Bootstrap 3 classes.
    ------------------------------------------------------------------------ */
 
+#mtw-model-lookup {
+    padding-left: 360px;
+    padding-right: 360px;
+}
+
 .mtw-ml {
   --ml-ink: #12171f;
   --ml-muted: #5b6678;
