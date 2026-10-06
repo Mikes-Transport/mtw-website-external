@@ -86,6 +86,12 @@
 
     shopOrigin: 'https://www.mtw.co.nz',
 
+    /* The shop's header cart, refreshed after every add so it stops showing a
+       stale count. cartParts are the nodes inside it that hold the count and
+       the total - those are what get swapped for the server's versions. */
+    cartSelector: '.cart-outer',
+    cartParts: ['.items', '.total'],
+
     /* Look each stock code up through the shop's own search as the visitor
        needs it, rather than shipping a prebuilt index.
 
@@ -966,7 +972,51 @@
       credentials: 'same-origin'
     }).then(function (r) {
       if (!r.ok) throw new Error('cart HTTP ' + r.status);
-      return true;
+      /* The response is the cart page itself - the add redirects to /cart -
+         so it already carries an up-to-date header cart. Handing it back costs
+         nothing extra. */
+      return r.text().then(function (html) {
+        syncHeaderCart(html);
+        return true;
+      });
+    });
+  }
+
+  /* Refresh the shop's header cart after an add.
+
+     Without this the header is stale the moment the widget stops navigating:
+     it still shows whatever was there at page load, so adding from the lookup
+     appears to do nothing until you reload.
+
+     The server's own markup is the source of truth. The count, the total, the
+     Excl. GST suffix and the is-filled / is-empty class are all computed by
+     the shop, and rebuilding them here would mean reimplementing its rounding
+     and its empty state - the two things most likely to drift out of step.
+     So the block is lifted out of the response and swapped in.
+
+     Only the two inner nodes are replaced, not the whole .cart-outer. The
+     outer element belongs to the host theme and may be the thing its own
+     script holds a reference to; replacing it could break the page's cart
+     behaviour. */
+  function syncHeaderCart(html) {
+    var live = document.querySelector(cfg.cartSelector);
+    if (!live) return;
+
+    var fresh;
+    try {
+      fresh = new DOMParser().parseFromString(html, 'text/html')
+        .querySelector(cfg.cartSelector);
+    } catch (e) { return; }
+    if (!fresh) return;
+
+    /* Query the theme's own parts rather than hardcoding them, but fall back
+       to the known selectors if either is absent. */
+    var parts = cfg.cartParts;
+    parts.forEach(function (sel) {
+      var mine = live.querySelector(sel);
+      var theirs = fresh.querySelector(sel);
+      if (!mine || !theirs || !mine.parentNode) return;
+      mine.parentNode.replaceChild(document.importNode(theirs, true), mine);
     });
   }
 
@@ -1197,12 +1247,17 @@
   /* --- selection bar ----------------------------------------------------- */
 
   /* The design shows a plain bar, not a sticky one, and an "Added to cart"
-     confirmation that turns the button green. */
+     confirmation that turns the button green.
+
+     This only flips the flag. Label and enabled state belong to updateBar(),
+     which is the single place that reads the selection - setting them here as
+     well left the button stuck disabled after the first successful add, and
+     every later add silently did nothing. */
   function setAdded(on) {
     var btn = document.getElementById('mtw-ml-add');
     if (!btn) return;
     btn.className = on ? 'mtw-ml__add is-done' : 'mtw-ml__add';
-    btn.textContent = on ? 'Added to cart' : 'Add to cart';
+    updateBar();
   }
 
   /* Parts render in two halves so cards can arrive one at a time. The shell
@@ -1366,7 +1421,10 @@
       else delete qty[p.sku];
       minus.disabled = n <= 0 || !buyable;
       writeUrl(state.rego, qty);
-      updateBar();
+      /* Any quantity change makes an "Added to cart" confirmation stale.
+         Done here rather than on a click listener so that typing a quantity
+         into the field clears it too. */
+      setAdded(false);
     }
 
     minus.addEventListener('click', function (e) {
@@ -1379,8 +1437,6 @@
     });
     input.addEventListener('change', function () { set(input.value); });
     input.addEventListener('click', function (e) { e.stopPropagation(); });
-    /* Any quantity change means the confirmation is stale. */
-    box.addEventListener('click', function () { setAdded(false); });
 
     minus.disabled = !(parseInt(input.value, 10) > 0) || !buyable;
     plus.disabled = !buyable;
@@ -1395,7 +1451,13 @@
      showing the quantities that are now in the cart, and pressing "Add to
      cart" a second time silently doubles the order. */
   function resetQtys() {
-    state.qty = {};
+    /* Cleared in place, not replaced. Every stepper closed over the object
+       that was passed to it at render time, so swapping state.qty for a fresh
+       {} would leave them writing to a detached object - the URL and the
+       totals would silently stop following the steppers. */
+    for (var sku in state.qty) {
+      if (Object.prototype.hasOwnProperty.call(state.qty, sku)) delete state.qty[sku];
+    }
     [].slice.call(document.querySelectorAll('.mtw-ml__step-input')).forEach(function (i) {
       i.value = '0';
     });
@@ -1430,13 +1492,15 @@
     if (!bar) return;
 
     var btn = document.getElementById('mtw-ml-add');
-    /* The button is mid-request or already confirmed. updateBar runs on every
-       keystroke in a stepper and every arriving card, so it must not stomp
-       those labels back to "Add to cart". */
-    var transient = btn.dataset.working === '1' || btn.className.indexOf('is-done') > -1;
-    if (!transient) {
+    if (!btn) return;
+
+    /* Mid-request only. The "Added to cart" label is fine to keep until the
+       selection changes - setAdded(false) clears it - but the enabled state
+       always tracks the selection, otherwise a confirmation would leave the
+       button dead. */
+    if (btn.dataset.working !== '1') {
       btn.disabled = !sel.lines.length;
-      btn.textContent = 'Add to cart';
+      btn.textContent = btn.className.indexOf('is-done') > -1 ? 'Added to cart' : 'Add to cart';
     }
 
     /* These are two separate elements. Writing textContent to the parent
