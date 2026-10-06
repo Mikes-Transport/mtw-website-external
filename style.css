@@ -1130,10 +1130,18 @@ body.public_index #footer {
     will-change: transform;
   }
 
+  /* 124px logos rather than 150px, with the extra room taken up as
+     padding around the strip - the row ends up taller than it was at
+     150px tiles, but the logos themselves are smaller. */
+  #home-brands-inner {
+    padding-top: 50px !important;
+    padding-bottom: 50px !important;
+  }
+
   #home-brands-inner ul.mtw-marquee__track > li {
-    flex: 0 0 150px !important;
+    flex: 0 0 124px !important;
     float: none !important;
-    width: 150px !important;
+    width: 124px !important;
     margin: 0 !important;
     text-align: center;
   }

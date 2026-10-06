@@ -342,16 +342,16 @@
     {
       selector: 'body.public_index .featured-products ul',
       responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
-                    1000: { items: 5, nav: true }, 1200: { items: 6, nav: true },
-                    1600: { items: 8, nav: true }, 1920: { items: 9, nav: true },
-                    2200: { items: 11, nav: true } }
+                    1000: { items: 6, nav: true }, 1200: { items: 8, nav: true },
+                    1600: { items: 10, nav: true }, 1920: { items: 12, nav: true },
+                    2200: { items: 14, nav: true } }
     },
     {
       selector: 'body.public_index #clearance-right ul',
       responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
-                    1000: { items: 5, nav: true }, 1200: { items: 6, nav: true },
-                    1600: { items: 8, nav: true }, 1920: { items: 9, nav: true },
-                    2200: { items: 11, nav: true } }
+                    1000: { items: 6, nav: true }, 1200: { items: 8, nav: true },
+                    1600: { items: 10, nav: true }, 1920: { items: 12, nav: true },
+                    2200: { items: 14, nav: true } }
     }
   ];
 
