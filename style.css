@@ -13,6 +13,34 @@ body.public_index #block_5 {
   padding-right: 50px !important;
 }
 
+/* 50px a side is right on desktop but brutal on a phone: at 320px it leaves
+   only 205px for the logo plus the menu button, which is not enough, so the
+   menu drops onto its own row and the header doubles to 88px tall.
+
+   16px keeps the two side by side down to 320 and matches the value the
+   footer already uses below 992. Measured: 50px wraps at 320 and 360, 16px
+   is a single row at every width from 320 up (it still wraps at 280, which
+   is narrower than any phone in use). */
+
+@media (max-width: 991px) {
+  #header {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* The theme declares #mobile-header twice, and the second one wins:
+       #mobile-header { background: rgba(0,0,0,0) ... }   transparent
+       #mobile-header { background: #474b4f; ... }         grey, comes later
+
+     So the mobile menu sits on a grey panel against the black header. The
+     header is already black, so transparent drops it out and the icons sit
+     straight on the black. Icons keep their own colours (white, and green
+     for the hamburger), which is why only the panel background goes. */
+  #mobile-header {
+    background: transparent !important;
+  }
+}
+
 #header #header-inner {
   max-width: 100vw !important;
   width: 100% !important;
@@ -52,6 +80,65 @@ body.public_index #block_5 {
 #block_12 > p:nth-of-type(3) {
   grid-column: 2;
   grid-row: 2;
+}
+
+/* The rule above for the company name is written as
+   #block_12 > span { grid-column: 1 / -1 }
+   but block_12 contains no span at all - its three children are all <p>.
+   So that selector never matched anything, and "MIKE'S TRANSPORT WAREHOUSE
+   LTD" was left to auto-place into column 1, which is half the block. It
+   wrapped onto two lines at 195px wide while the row next to it sat empty.
+
+   Targeting p:nth-of-type(1) - the element that is actually there - gives
+   it the full width: one line instead of two, and the block drops from
+   111px to 87px tall, which lets the header shrink to the logo's 107px.
+   The two address columns below are untouched. */
+
+#block_12 > p:nth-of-type(1) {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+/* Address text steps up with the viewport, and the block widens with it.
+
+   Two things drive the size here, and they have to move together:
+
+   1. The address paragraphs were display:flex; flex-direction:column, so
+      every child element (the "»" icon, the address link, the phone span)
+      became its own row. Letting them flow as normal text instead is the
+      bigger win of the two - at 12px that alone takes the block from 78px
+      to 60px.
+
+   2. Font size on its own is not enough. block_12 is a fixed-width box, so
+      a larger font just wraps onto more lines and the block gets TALLER:
+      13px in a 390px box measures 83px, while 13px in a 500px box
+      measures 63px. So each step widens the block as well as the text.
+
+   Measured result:
+     1024-1199   390x57   11px
+     1200-1439   440x60   12px
+     1440+       500x63   13px
+   Down from 390x87 before this, with the search bar and nav untouched.
+   Font size is set on the <p> alone - no child carries an explicit size,
+   so it all inherits from there.
+
+   The rules themselves live at the very end of this file, after the
+   desktop header sizing block. That block sets max-width: 390px on
+   #block_12 at min-width 992, and it has to come first or it overrides
+   the 440px and 500px steps below it. */
+
+/* The theme hides this block below 992px and swaps in the mobile menu:
+     #header #header-inner #block_12 { display: none }
+     @media (min-width: 992px) { ... { display: block } }
+
+   Neither carries !important, so the display:grid !important above beats
+   them both and leaves the desktop header block rendering on phones. Put
+   the theme's hide back for the widths where it wanted it hidden. Three
+   ids beat the single id above, so this wins without editing that rule. */
+@media (max-width: 991px) {
+  #header #header-inner #block_12 {
+    display: none !important;
+  }
 }
 
 #everything-outer div.search-outer form.search {
@@ -487,4 +574,423 @@ flex: 0 0 100% !important;
     flex: 0 1 auto !important;
     width: 100% !important;
   }
+}
+
+/* ------------------------------------------------------------------
+   Desktop header sizing, 992px and up.
+
+   The search bar had no max-width, so it grew to fill whatever the logo
+   and block_12 left over: 371px at 1024, 480px from 1200. That squeezed
+   block_12 down to 258px, which forced its three rows of contact text to
+   wrap and made it 180px tall - taller than the 136px logo, so the header
+   grew to 201px and the block sat crammed in the corner.
+
+   Capping the search hands that width back to block_12, and capping
+   block_12 stops it sprawling to 631px on a wide screen. Between the two,
+   block_12 is a steady 340x132 and the header matches the logo height at
+   every width tested (992 to 1600).
+   ------------------------------------------------------------------ */
+
+@media (min-width: 992px) {
+  #header #header-inner div.search-outer {
+    max-width: 240px !important;
+  }
+
+  /* The logo is pinned to 200px by the theme, which pushed the search bar
+     right and left block_12 with whatever was left over. Dropping the logo
+     to 150px moves the search bar left and hands that width to block_12,
+     which goes from 340x132 to 390x111 - so the header row drops from
+     136px tall to 111px as well, matching the smaller logo. */
+
+  #header #header-inner #block_10 img {
+    max-width: 150px !important;
+  }
+
+  #header #header-inner > #block_10 {
+    margin-right: 30px !important;
+  }
+
+  #header #header-inner #block_12 {
+    max-width: 390px !important;
+  }
+}
+
+/* The nav dropped the cart and account links onto a second row because the
+   aside was 537px wide while its own contents only came to about 447px.
+   Tightening the gaps reclaims that, and the cart total ("$0.00") is hidden
+   below 1200 where the bar is tightest.
+
+   One row now holds at 1100-1200 and 1366+. At 992-1099 and around 1280
+   there is genuinely not enough room: the six links want ~555px and the
+   cart and account icons ~380px, which is more than those widths allow.
+   Forcing nowrap there was tried and is worse - it squeezes the six links
+   until they wrap inside the bar instead. */
+
+@media (min-width: 992px) {
+  #nav-inner #navbar .aside {
+    gap: 8px !important;
+  }
+
+  #nav-inner #navbar #menu_5 li a {
+    padding: 0 8px !important;
+  }
+
+  #nav-inner #navbar .aside .acc-btn:before {
+    margin-right: 8px !important;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+  #nav-inner #navbar div.cart-outer .total {
+    display: none !important;
+  }
+}
+
+/* The page inset steps down from 50px to 28px at 1024 so the nav fits on
+   one row.
+
+   All five elements that carry the 50px inset move together - header,
+   nav, content (declared twice) and footer. Stepping only the header and
+   nav would leave the body content and footer overhanging 22px further
+   left than the logo, which looks like a mistake.
+
+   28px is the largest value that holds. Measured slack on the nav bar,
+   where 0 means it is exactly full and anything less wraps to two rows:
+     40px  ->  1280 wraps
+     36px  ->  1280 fits with 1px spare, too tight to trust
+     32px  ->  1280 fits with 9px spare, still thin
+     28px  ->  1280 fits with 17px spare, 1024 with 29px
+   Below 1024 it stays at 50px, and 992 still needs two rows. */
+
+@media (min-width: 1024px) {
+  #header,
+  #nav-outer,
+  body.public_index #content,
+  body.public_index #footer {
+    padding-left: 28px !important;
+    padding-right: 28px !important;
+  }
+}
+
+/* The search bar steps up from 1024, the same way the page inset steps
+   down. It was pinned at 240px everywhere, which left 143px of dead space
+   at 1024 and over 1000px of it at 1920.
+
+     1024-1199   280px
+     1200-1439   380px
+     1440+       480px
+
+   These were 320/440/560 and have come down a step - the bar reads as
+   oversized next to a 150px logo. There is still plenty of room: the
+   ceiling before block_12 starts being squeezed is 383px at 1024,
+   559 at 1200 and 799 at 1440.
+
+   Below 1024 it stays at 240px. Verified at every boundary (1024, 1199,
+   1200, 1439, 1440, 1920): block_12 unchanged, header stays 107px, nav
+   one row, no horizontal overflow. */
+
+@media (min-width: 1024px) {
+  #header #header-inner div.search-outer {
+    max-width: 280px !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  #header #header-inner div.search-outer {
+    max-width: 380px !important;
+  }
+}
+
+@media (min-width: 1440px) {
+  #header #header-inner div.search-outer {
+    max-width: 480px !important;
+  }
+}
+/* ------------------------------------------------------------------
+   block_12 sizing steps. These live at the very end of the file on
+   purpose: the desktop header sizing block above sets max-width: 390px
+   on #block_12 at min-width 992, and these have to come after it or
+   they get overridden.
+
+   Two things drive the size, and they have to move together:
+
+   1. The address paragraphs are display: flex; flex-direction: column,
+      so every child element - the ">" icon, the address link, the phone
+      span - becomes its own row. Letting them flow as normal text is
+      the bigger win of the two: at 12px that alone takes the block from
+      78px to 60px.
+
+   2. Font size alone is not enough. The block is a fixed-width box, so a
+      larger font just wraps onto more lines and the block gets TALLER -
+      13px in a 390px box measures 83px, but 13px in a 500px box
+      measures 63px. Hence each step widens the block as well as the
+      text.
+
+   Measured:
+     1024-1199   390x57   11px
+     1200-1439   440x60   12px
+     1440+       500x63   13px
+   Down from 390x87 before this, nav and search bar untouched.
+   Font size is set on the <p> alone - no child carries an explicit size,
+   so it all inherits from there.
+   ------------------------------------------------------------------ */
+
+@media (min-width: 1024px) and (max-width: 1199px) {
+  #header #header-inner #block_12 {
+    max-width: 390px !important;
+  }
+
+  #header #header-inner #block_12 p {
+    font-size: 11px !important;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1439px) {
+  #header #header-inner #block_12 {
+    max-width: 440px !important;
+  }
+
+  #header #header-inner #block_12 p {
+    font-size: 12px !important;
+  }
+}
+
+@media (min-width: 1440px) {
+  #header #header-inner #block_12 {
+    max-width: 500px !important;
+  }
+
+  #header #header-inner #block_12 p {
+    font-size: 13px !important;
+  }
+}
+
+/* Let the address children flow as text instead of each taking its own
+   flex row. Scoped to the two address paragraphs only. */
+
+@media (min-width: 1024px) {
+  #header #header-inner #block_12 > p:nth-of-type(2),
+  #header #header-inner #block_12 > p:nth-of-type(3) {
+    display: block !important;
+  }
+}
+
+/* Stack the two addresses on their own full-width rows instead of sitting
+   them side by side.
+
+   Side by side, each column is only half the block (195px at 1024) and
+   that is not enough for "6624 Te Rapa Road, Hamilton 3200" plus the
+   phone number. So they wrapped mid-address: "Hamilton" ended line one
+   and the postcode "3200" started line two, torn away from the street it
+   belongs to. Both columns did it.
+
+   Full width, each address fits on a single line, and the block is no
+   taller - two 17px rows cost the same as one 33px row:
+
+     1024    320x57   (was 390x57 with ragged two-column text)
+     1200    340x60   (was 440x60)
+     1440    384x63   (was 500x63) */
+
+@media (min-width: 1024px) {
+  #header #header-inner #block_12 > p:nth-of-type(2) {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+  }
+
+  #header #header-inner #block_12 > p:nth-of-type(3) {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+  }
+}
+/* Separator between each address and its phone number.
+
+   Each address paragraph is two inline spans with a whitespace text node
+   between them - the address, then the phone number:
+
+     <p><span>» 6624 Te Rapa Road, Hamilton 3200</span> <span>07 850 8333</span></p>
+
+   The markup comes from the CMS, so the separator is added with a
+   pseudo-element on the phone span rather than by editing the HTML. It is
+   dimmed white so it reads as a divider and not as part of either side.
+
+   The existing whitespace node stays, which gives "3200 | 07 850 8333"
+   with correct spacing on either side of the bar. */
+
+@media (min-width: 1024px) {
+  #header #header-inner #block_12 > p:nth-of-type(2) span:nth-of-type(2)::before,
+  #header #header-inner #block_12 > p:nth-of-type(3) span:nth-of-type(2)::before {
+    content: "|";
+    color: rgba(255, 255, 255, 0.45);
+    padding: 0 6px;
+  }
+}
+/* ------------------------------------------------------------------
+   Content width and inset.
+
+   The header, nav and the media slider at the top are deliberately left
+   alone - they are full-bleed and sized independently. This is only the
+   area below the slider: #content-outer > #content > #content-inner and
+   the footer.
+
+   Two things were holding the content at a fixed 1170px. The theme sets
+   a container scale on #content-inner and several of the sections inside
+   it:
+
+     #above-header-inner, #content-inner, #footer-inner, #header-inner,
+     #nav-inner { width: 100%; max-width: 980px }
+     @media ... { ... width: 980px; max-width: none }
+     @media ... { ... width: 1170px }
+
+   We already override that for #header-inner and #nav-inner, but not for
+   #content-inner, so the body sat in a 1170px column centred inside the
+   page while the header above it ran the full width. The same 1170px
+   applied to #home-categories, #homepage-promotion, #homepage-image-
+   slider-1, #homepage-cta-hotproduct, #home-brands-inner and two footer
+   blocks, so they all had to be freed together or the inner ones would
+   stay stuck at 1170 inside a full-width parent.
+
+   The inset then steps up towards 100px on wide screens. It cannot be a
+   flat 100px lower down: at 1024 that leaves only 809px of content, and
+   the promos and carousels start to look cramped.
+   ------------------------------------------------------------------ */
+
+#content-inner,
+#home-categories,
+#homepage-promotion,
+#homepage-image-slider-1,
+#homepage-cta-hotproduct,
+#home-brands-inner,
+#footer-subscribe .inner,
+#footer-bottom #block_8 {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* The theme puts its own responsive padding on #content-inner
+   (padding: 0 5% 10px). Inset is controlled from #content instead so
+   there is a single place setting it. */
+
+#content-inner {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Inset steps. Selected after the 1024 group above so it wins, and given
+   the same body.public_index qualifier for the same reason. */
+
+body.public_index #content,
+body.public_index #footer {
+  padding-left: 32px !important;
+  padding-right: 32px !important;
+}
+
+@media (min-width: 1200px) and (max-width: 1439px) {
+  body.public_index #content,
+  body.public_index #footer {
+    padding-left: 56px !important;
+    padding-right: 56px !important;
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1679px) {
+  body.public_index #content,
+  body.public_index #footer {
+    padding-left: 80px !important;
+    padding-right: 80px !important;
+  }
+}
+
+@media (min-width: 1680px) {
+  body.public_index #content,
+  body.public_index #footer {
+    padding-left: 100px !important;
+    padding-right: 100px !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Home category rows.
+
+   Both rows are the same four tiles. The CMS emits two elements with the
+   same id, and the group class is on the #home-categories element itself
+   rather than inside it, so the selector has to target the group:
+
+     div#home-categories.layout_group_14
+     div#home-categories.layout_group_52
+
+   Each row is now a grid of auto-fit tracks rather than a flex row of
+   fixed-quarter tiles:
+
+     display: grid;
+     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+     gap: 6px;
+
+   auto-fit holds as many tiles as fit at a sensible minimum and shares
+   the leftover space between them, so tiles shrink as the page widens
+   instead of growing, and the row ends flush with the content edge
+   instead of leaving a gap at the right. It also does not care how many
+   tiles there are - four today, seven once three more blocks are added.
+
+   The 190px floor is what decides how many sit in a row: seven need
+   7 x 190 + 6 x 6 = 1366px. At a 200px floor the requirement was 1436px
+   and 1600 fell just short, wrapping to six plus an orphan.
+
+   Measured with seven tiles: 1600 -> 198px, 1920 -> 238px, 2200 -> 278px,
+   2560 -> 330px. Below 1600 the seventh tile wraps, which is expected
+   with a fixed tile count and a genuinely narrower row.
+
+   The old flex sizing (flex: 0 1 calc(25% - 6px) with justify-content:
+   space-between) is neutralised below. Capping the tiles on its own did
+   nothing visible - space-between handed the freed space straight back
+   as 115px gaps, leaving the row the same overall width and merely
+   airier.
+   ------------------------------------------------------------------ */
+
+.layout_group_14,
+.layout_group_52 {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+  gap: 6px !important;
+  justify-content: normal !important;
+  justify-items: stretch !important;
+}
+
+.layout_group_14 > *,
+.layout_group_52 > * {
+  flex: none !important;
+  max-width: none !important;
+  width: auto !important;
+  /* The theme gives these blocks margin: 3px 0. The grid gap handles
+     spacing now, and leaving it in made the tiles sit 3px lower than
+     anything else in the row. */
+  margin: 0 !important;
+}
+
+/* Placeholder styling for the three extra category tiles in each row.
+   Delete along with the categoryPlaceholders block in load-css.js. */
+
+.mtw-cat-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 1 / 1;
+  background: #f4f6f4;
+  border: 2px dashed #9fb98f;
+  border-radius: 3px;
+  color: #6d8a5c;
+  font-family: REM, sans-serif;
+  text-align: center;
+}
+
+.mtw-cat-placeholder__n {
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mtw-cat-placeholder__t {
+  font-size: 12px;
 }

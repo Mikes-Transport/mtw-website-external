@@ -300,3 +300,233 @@
 
   window.addEventListener('resize', onResize);
 })();
+
+/* ------------------------------------------------------------------------
+   Wider carousel breakpoints.
+
+   The theme's main.js initialises the homepage carousels with a responsive
+   scale that stops at 1000px:
+
+     .featured-products ul   0:1   600:2   1000:5
+     #clearance-right ul     0:1   600:2   1000:4
+
+   There is no breakpoint above 1000, so on a wide screen every extra pixel
+   of container turns into a wider card rather than another card. At 1920
+   that meant 4 cards at 426px each, and at 2560 they were 586px.
+
+   That config lives in a script on the site owner's CDN
+   (site/modtransnz/template/js/custom/main.js), not in this repo, so it
+   cannot be edited from here. Instead this re-initialises the two
+   carousels once the theme has finished with them, using the theme's own
+   options verbatim and only extending the responsive scale.
+
+   The options are copied exactly - autoplay, loop, nav, navText and all -
+   so nothing about the carousels changes except how many show. Anything
+   less and the re-init would silently drop the theme's behaviour.
+
+   The scale tops out at 9 cards at 1920 and works back down from there:
+     2200:10   1920:9   1600:7   1200:5   1000:4   600:2   0:1
+
+   Both carousels are optional. If Owl never loads, or the theme markup is
+   absent, this quietly does nothing.
+   ------------------------------------------------------------------------ */
+
+(function widenCarousels() {
+  'use strict';
+
+  var MARK = 'data-mtw-carousel';
+  var NAV = ["<i class='fa fa-angle-left'></i>", "<i class='fa fa-angle-right'></i>"];
+
+  /* Verbatim from the theme, plus the wider steps up to 9 cards at 1920. */
+  var TARGETS = [
+    {
+      selector: 'body.public_index .featured-products ul',
+      responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
+                    1000: { items: 4, nav: true }, 1200: { items: 5, nav: true },
+                    1600: { items: 7, nav: true }, 1920: { items: 9, nav: true },
+                    2200: { items: 10, nav: true } }
+    },
+    {
+      selector: 'body.public_index #clearance-right ul',
+      responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
+                    1000: { items: 4, nav: true }, 1200: { items: 5, nav: true },
+                    1600: { items: 7, nav: true }, 1920: { items: 9, nav: true },
+                    2200: { items: 10, nav: true } }
+    }
+  ];
+
+  var OPTION_KEYS = ['margin', 'stagePadding', 'autoplay', 'autoplayTimeout',
+    'autoplaySpeed', 'autoplayHoverPause', 'loop', 'nav', 'responsiveClass',
+    'navText', 'items', 'rtl', 'center', 'mouseDrag', 'touchDrag',
+    'smartSpeed', 'fluidSpeed', 'dots', 'animateIn', 'animateOut'];
+
+  function build(responsive) {
+    return {
+      margin: 0,
+      stagePadding: 0,
+      autoplay: true,
+      autoplayTimeout: 3000,
+      autoplaySpeed: 800,
+      autoplayHoverPause: true,
+      loop: true,
+      nav: true,
+      responsiveClass: true,
+      navText: NAV,
+      responsive: responsive
+    };
+  }
+
+  function apply($) {
+    var did = 0;
+
+    TARGETS.forEach(function (t) {
+      var $el = $(t.selector);
+      if (!$el.length) return;
+
+      /* Only re-init once per element. */
+      if ($el[0].getAttribute(MARK) === 'done') return;
+
+      /* Wait until the theme has actually initialised it. An uninitialised
+         <ul> has no .owl-item children; Owl also clones items when loop is
+         on, so at least a couple is a safe signal. */
+      if ($el.find('.owl-item').length < 2) return;
+
+      $el.attr(MARK, 'done');
+
+      try {
+        /* Copy whatever options the theme used, so an option this file
+           does not name still survives the re-init. */
+        var live = $.data($el[0], 'owl.carousel');
+        var opts = build(t.responsive);
+        if (live && live.options) {
+          OPTION_KEYS.forEach(function (k) {
+            if (k !== 'responsive' && live.options[k] !== undefined) opts[k] = live.options[k];
+          });
+        }
+        $el.owlCarousel('destroy');
+        $el.owlCarousel(opts);
+        did++;
+      } catch (e) {
+        /* If Owl is in a state we did not expect, leave the theme's own
+           carousel alone rather than risk a half-built one. */
+        $el.removeAttr(MARK);
+        if (window.console && console.warn) console.warn('mtw: carousel widen skipped', e);
+      }
+    });
+
+    return did;
+  }
+
+  /* The theme loads Owl asynchronously with $.getScript and initialises in
+     its callback, so there is no event to hook - poll for it instead. */
+  function waitForOwl(attempt) {
+    attempt = attempt || 0;
+
+    if (window.jQuery && jQuery.fn && jQuery.fn.owlCarousel) {
+      if (apply(jQuery) > 0) return;
+    }
+
+    if (attempt < 80) {
+      setTimeout(function () { waitForOwl(attempt + 1); }, 250);
+    }
+  }
+
+  /* Only the homepage has these carousels. This check has to wait for the
+     body: the loader is a script in <head>, so document.body is still null
+     when this file first runs. */
+  function init() {
+    if (!document.body) return;
+    if (!/public_index/.test(document.body.className || '')) return;
+    waitForOwl(0);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+/* ------------------------------------------------------------------------
+   Placeholder category tiles.
+
+   TEMPORARY - remove this whole block once real blocks are in place.
+
+   The two home category rows hold four tiles each, which means four tiles
+   share the full content width and end up 422px across at 1920. The grid
+   in style.css only balances properly at seven.
+
+   These blocks cannot be added from here - the tiles are CMS layout
+   blocks (div#block_13..16 in layout_group_14, and the equivalents in
+   layout_group_52). So three clearly-marked placeholders are injected per
+   row to show the seven-across layout, and to mark where the real content
+   goes.
+
+   To make them real, delete this block from load-css.js and the
+   .mtw-cat-placeholder rules from style.css, then add three blocks to each
+   group in the CMS layout manager. The script also stands down on its own
+   if a row already has seven or more tiles, so it will not double up once
+   the real ones exist.
+   ------------------------------------------------------------------------ */
+
+(function categoryPlaceholders() {
+  'use strict';
+
+  var MARK = 'data-mtw-placeholders';
+  var GROUPS = ['.layout_group_14', '.layout_group_52'];
+  var WANT = 3;
+  var FULL = 7;
+
+  function placeholder(n) {
+    var el = document.createElement('div');
+    el.className = 'mtw-cat-placeholder';
+    el.setAttribute('aria-hidden', 'true');
+    var top = document.createElement('span');
+    top.className = 'mtw-cat-placeholder__n';
+    top.textContent = 'tile ' + n;
+    var bot = document.createElement('span');
+    bot.className = 'mtw-cat-placeholder__t';
+    bot.textContent = 'add in CMS';
+    el.appendChild(top);
+    el.appendChild(bot);
+    return el;
+  }
+
+  function add() {
+    if (!document.body || !/public_index/.test(document.body.className || '')) return;
+
+    GROUPS.forEach(function (sel) {
+      [].forEach.call(document.querySelectorAll(sel), function (group) {
+        /* Already done, or the CMS now supplies the real tiles. */
+        if (group.getAttribute(MARK) === 'done') return;
+        if (group.children.length >= FULL) {
+          group.setAttribute(MARK, 'done');
+          return;
+        }
+
+        group.setAttribute(MARK, 'done');
+        var start = group.children.length;
+        for (var i = 0; i < WANT; i++) {
+          group.appendChild(placeholder(start + i + 1));
+        }
+      });
+    });
+  }
+
+  /* The groups are rebuilt by the CMS layout manager after DOM ready, so
+     wait for them to appear rather than running once and finding nothing. */
+  function wait(tries) {
+    tries = tries || 0;
+    if (document.querySelector('.layout_group_14')) {
+      add();
+      return;
+    }
+    if (tries < 40) setTimeout(function () { wait(tries + 1); }, 250);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { wait(0); });
+  } else {
+    wait(0);
+  }
+})();
