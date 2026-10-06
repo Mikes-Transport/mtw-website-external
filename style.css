@@ -1122,13 +1122,15 @@ body.public_index #footer {
        block as tall as the logos beside it. */
     display: inline-flex !important;
     flex-direction: column !important;
-    align-items: center !important;
+    /* words left aligned in the block, block itself still vertically
+       centred against the carousel */
+    align-items: flex-start !important;
     justify-content: center !important;
     min-height: 70px !important;
     width: 150px;
     overflow: hidden;
     white-space: nowrap;
-    text-align: center !important;
+    text-align: left !important;
     transition: width 0.25s ease, background-color 0.25s ease;
   }
 
