@@ -109,6 +109,7 @@
   padding: 0 18px;
   background: #12171f;
   color: #ffffff;
+  border-radius: 8px !important;
 }
 .mtw-ml__search button:hover { background: #2a323d; }
 
@@ -117,6 +118,7 @@
   padding: 0 22px;
   background: var(--ml-accent);
   color: #07111f;
+   border-radius: 8px !important;
 }
 .mtw-ml__add:hover:not(:disabled) { background: #46a6f5; }
 .mtw-ml__add:disabled { background: #eef1f5; color: #aab4c2; cursor: not-allowed; }
@@ -314,7 +316,7 @@
   gap: 12px;
   align-items: flex-start;
 }
-.mtw-ml__split > * { flex: 1 1 0; min-width: 0; }
+.mtw-ml__split > * { flex: 1 1 0; min-width: 0; height: 273px;}
 
 .mtw-ml__side {
   display: flex;
@@ -526,18 +528,18 @@
   border-radius: 0;
   overflow: visible;
 }
-.mtw-ml__step:focus-within { outline: 2px solid var(--ml-accent); outline-offset: 3px; }
+.mtw-ml__step:focus-within { outline: none;}
 
 .mtw-ml__step-btn {
-  width: 20px !important;
-  min-width: 20px !important;
+  width: 22px !important;
+  min-width: 22px !important;
   height: 24px !important;
   flex: 0 0 20px !important;
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
+  border-radius: 4px !important;
+  background: #ececec !important;
   box-shadow: none !important;
   color: var(--ml-muted);
   font-family: inherit;
@@ -596,6 +598,7 @@
   background: #ffffff;
   border: 1px solid var(--ml-line);
   border-radius: 10px;
+   width: 40%;
 }
 /* Block-level, so the label sits above the total instead of running into
    it. The theme's flex rules were collapsing them onto one line. */
@@ -618,6 +621,14 @@
   font-size: 15px;
   font-weight: 800;
   margin-top: 2px;
+}
+
+textarea:focus,
+input[type="search"]:focus {
+   outline: none !important;
+   -webkit-box-shadow: none !important;
+   box-shadow: none !important;
+   -moz-box-shadow: none !important;
 }
 
 /* --- narrow screens ---------------------------------------------------------- */
