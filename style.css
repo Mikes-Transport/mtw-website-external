@@ -1136,6 +1136,24 @@ body.public_index #footer {
     padding: 0 !important;
   }
 
+  /* Each tile is just the logo. The theme puts a caption and a VIEW button
+     on every brand tile; on a strip that scrolls they are noise, and they
+     were also what made the tiles 317px tall instead of square. */
+
+  #home-brands-inner ul.mtw-marquee__track > li div.name,
+  #home-brands-inner ul.mtw-marquee__track > li div.button-outer,
+  #home-brands-inner ul.mtw-marquee__track > li div.product-actions,
+  #home-brands-inner ul.mtw-marquee__track > li div.actions {
+    display: none !important;
+  }
+
+  /* The grey band behind the block (#home-brands is rgb(237,237,237)) read
+     as a stray panel. The page is already white, so it goes. */
+
+  #home-brands {
+    background: transparent !important;
+  }
+
   #home-brands-inner ul.mtw-marquee__track > li div.photo {
     width: 100% !important;
   }
