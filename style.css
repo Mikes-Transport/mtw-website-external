@@ -1552,3 +1552,98 @@ body.public_index #footer {
     margin-bottom: 24px !important;
   }
 }
+/* ------------------------------------------------------------------
+   Hover on the injected category tiles.
+
+   The theme hovers these tiles with a dark overlay rather than a lift or
+   a scale. From modtransnz/css/main.css:
+
+     #home-categories [id*=block_]:before {
+       content:""; background:#000; opacity:.1;
+       position:absolute; inset:0; z-index:1;
+       border-right:1px solid #000; transition:all .2s ease-out;
+     }
+     :first-child:before      { opacity:.55 }
+     :nth-child(2):before     { opacity:.4 }
+     :nth-child(3):before     { opacity:.2 }
+     :hover:before            { opacity:.65;
+                                box-shadow:0 5px 10px 0 rgba(0,0,0,.9) }
+
+   The hook is an id attribute selector, and the tiles load-css.js injects
+   are <div class="mtw-cat-tile"> with no id, so they matched nothing:
+   no overlay at rest and no hover at all. The four CMS tiles in each row
+   kept the theme behaviour, so each row ramped from 55% black on the
+   first tile to untreated on the last three and only the left half
+   responded to the pointer.
+
+   Values copied verbatim from the theme rule so the two sets of tiles
+   behave identically. The positional steps are repeated even though the
+   injected tiles currently sit at positions 5-7 and so never match them
+   - if one is ever moved up they need to darken like their neighbours
+   rather than stay flat.
+
+   position: relative is load-bearing and not optional. Without it the
+   absolutely positioned overlay resolves against #home-categories, which
+   the theme also sets to position: relative, so the black would cover
+   the entire row instead of one tile.
+
+   Deliberately no !important on this rule. The trim further up the file
+   hides the tail of each row with display: none !important, and an
+   !important display: flex here would beat it purely by being later in
+   the file - which is what it did, leaving all seven tiles visible at
+   every width. The theme rule this copies also carries no !important,
+   for the same reason.
+
+   The <p> inside each tile already picks up z-index: 2 and
+   position: relative from the theme's own #home-categories p rule, so
+   the artwork sits above the overlay and does not need restating here.
+   ------------------------------------------------------------------ */
+
+.layout_group_14 > .mtw-cat-tile,
+.layout_group_52 > .mtw-cat-tile {
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.layout_group_14 > .mtw-cat-tile::before,
+.layout_group_52 > .mtw-cat-tile::before {
+  content: "";
+  background: #000;
+  opacity: 0.1;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  position: absolute;
+  z-index: 1;
+  border-right: 1px solid #000;
+  transition: all 0.2s ease-out;
+}
+
+.layout_group_14 > .mtw-cat-tile:first-child::before,
+.layout_group_52 > .mtw-cat-tile:first-child::before {
+  opacity: 0.55;
+}
+
+.layout_group_14 > .mtw-cat-tile:nth-child(2)::before,
+.layout_group_52 > .mtw-cat-tile:nth-child(2)::before {
+  opacity: 0.4;
+}
+
+.layout_group_14 > .mtw-cat-tile:nth-child(3)::before,
+.layout_group_52 > .mtw-cat-tile:nth-child(3)::before {
+  opacity: 0.2;
+}
+
+.layout_group_14 > .mtw-cat-tile:hover::before,
+.layout_group_52 > .mtw-cat-tile:hover::before {
+  opacity: 0.65;
+  -webkit-box-shadow: 0 5px 10px 0 rgba(0, 0, 0, 0.9);
+  box-shadow: 0 5px 10px 0 rgba(0, 0, 0, 0.9);
+}

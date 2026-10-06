@@ -415,7 +415,7 @@
 
     var m;
     if ((m = text.match(/\(([^)]*)\)/))) add(m[1]);
-    if ((m = text.match(/[-–—]\s*'?([A-Za-z0-9]{2,8})\s*$/))) add(m[1]);
+    if ((m = text.match(/[-â€“â€”]\s*'?([A-Za-z0-9]{2,8})\s*$/))) add(m[1]);
     if ((m = text.match(/\s{2,}([A-Za-z0-9]{2,8})\s*$/))) add(m[1]);
 
     return out;
@@ -679,15 +679,37 @@
       '.mtw-rd-fab:focus-visible{outline:3px solid #fff;outline-offset:-6px;box-shadow:0 0 0 3px ' + cfg.accent + '}',
       '.mtw-rd-fab svg{width:26px;height:26px}',
 
-      /* nav icon: inline, transparent, takes the nav's text colour */
-      '.mtw-rd-nav{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;' +
-        'height:40px;min-width:40px;padding:0 8px;border:0;border-radius:10px;background:transparent;' +
-        'color:inherit;font:inherit;font-weight:700;line-height:1;cursor:pointer}',
-      '.mtw-rd-nav:hover{background:rgba(127,127,127,.18)}',
-      '.mtw-rd-nav:focus-visible{outline:2px solid currentColor;outline-offset:2px}',
-      '.mtw-rd-nav svg{width:24px;height:24px;flex:none}',
-      '.mtw-rd-nav span{font-size:14px}',
-      '.mtw-rd-nav-li{list-style:none;display:flex;align-items:center}',
+      /* Nav icon.
+
+         These values are copied from the theme's own nav link, measured off
+         the live site, so the item sits in the bar exactly like its
+         neighbours rather than looking bolted on:
+
+           padding 10px 18px 20px, margin-top 10px, line-height 14px,
+           font-weight 500, 14px, uppercase, radius 6px 6px 0 0
+
+         `color` is deliberately not set here. It is applied inline from the
+         nav's own links, and a colour in this stylesheet would beat that. */
+      '.mtw-rd-nav{display:block !important;box-sizing:border-box !important;' +
+        'padding:10px 18px 20px !important;margin:10px 0 0 !important;' +
+        'border:0 !important;border-radius:6px 6px 0 0 !important;background:transparent !important;' +
+        'box-shadow:none !important;text-decoration:none !important;position:static !important;' +
+        'float:none !important;width:auto !important;min-width:0 !important;height:auto !important;' +
+        'font:inherit !important;font-family:inherit !important;font-size:14px !important;' +
+        'font-weight:500 !important;line-height:14px !important;letter-spacing:normal !important;' +
+        'text-transform:uppercase !important;white-space:nowrap !important;' +
+        'cursor:pointer !important;appearance:none !important;-webkit-appearance:none !important;' +
+        'display:inline-flex !important;align-items:center !important;gap:7px !important}',
+      '.mtw-rd-nav:hover{background:rgba(255,255,255,.16) !important}',
+      '.mtw-rd-nav:focus-visible{outline:2px solid currentColor !important;outline-offset:-2px !important}',
+      /* 15px sits with 14px text. The old 24px was nearly double and read as a
+         button rather than as a nav label. */
+      '.mtw-rd-nav svg{width:15px !important;height:15px !important;flex:none !important;' +
+        'display:block !important;margin:0 !important;stroke-width:1.9 !important}',
+      '.mtw-rd-nav span{font-size:14px !important;font-weight:500 !important;' +
+        'line-height:14px !important;color:inherit !important;letter-spacing:normal !important}',
+      '.mtw-rd-nav-li{list-style:none !important;display:block !important;float:none !important;' +
+        'position:static !important;padding:0 !important;margin:0 !important;width:auto !important}',
 
       /* drawer shell */
       '.mtw-rd{position:fixed;inset:0;z-index:' + cfg.zIndex + ';visibility:hidden;' +
@@ -769,8 +791,44 @@
 
     var style = document.createElement('style');
     style.id = 'mtw-rd-styles';
-    style.textContent = css;
+    style.textContent = forceImportant(css);
     document.head.appendChild(style);
+  }
+
+  /* Marks every declaration in the drawer's stylesheet as !important.
+
+     A blunt instrument, deliberately so. The drawer is dropped into someone
+     else's theme, and themes reset buttons, inputs, fonts, line-heights and
+     box-sizing on selectors far more specific than any single class -
+     "#menu_1 > li > button", "input[type=text]", bare "form div". The ones
+     that actually bit were font-family and line-height, which is why the panel
+     came out in the theme's font at the theme's leading.
+
+     Done as a pass over the finished string rather than by hand, so a rule
+     added later cannot forget it.
+
+     Walks the string a block at a time rather than running one big regex over
+     it: a naive pattern matches the colon in "@media (prefers-reduced-motion:
+     reduce)" and turns the condition into "reduce !important", which silently
+     kills the whole block. Splitting on } keeps selectors and at-rule
+     preludes out of reach of the substitution. */
+  function forceImportant(css) {
+    return css.split('}').map(function (seg) {
+      var brace = seg.indexOf('{');
+      if (brace < 0) return seg;                 // trailing text after a close
+      var prelude = seg.slice(0, brace);
+      var body = seg.slice(brace + 1);
+
+      /* Keyframe steps are not declarations - leave them alone. */
+      if (/^\s*@keyframes/i.test(prelude)) return prelude + '{' + body;
+
+      body = body.replace(/([-a-z]+)\s*:\s*([^;]+)(;?)/gi, function (m, prop, val, semi) {
+        if (val.indexOf('!important') > -1) return m;
+        return prop + ':' + val + ' !important' + semi;
+      });
+
+      return prelude + '{' + body;
+    }).join('}');
   }
 
   /* --- ui ---------------------------------------------------------------- */
@@ -1096,7 +1154,13 @@
        does rather than hardcoding a guess. */
     var siblingLink = host.querySelector && host.querySelector('a');
     if (siblingLink) {
-      try { fab.style.color = getComputedStyle(siblingLink).color; } catch (e) {}
+      try {
+          /* setProperty with 'important', not style.color: a themesheet's
+             !important rule outranks an ordinary inline declaration, so
+             utton{color:#ff0!important} was winning and painting the label
+             yellow. An important inline value outranks everything. */
+          fab.style.setProperty('color', getComputedStyle(siblingLink).color, 'important');
+        } catch (e) {}
     }
 
     if (cfg.navPosition === 'prepend') host.insertBefore(fab, host.firstChild);
@@ -1126,7 +1190,13 @@
          inherit the body's colour rather than the nav's. */
       var siblingLink = host.querySelector && host.querySelector('a');
       if (siblingLink) {
-        try { fab.style.color = getComputedStyle(siblingLink).color; } catch (e) {}
+        try {
+          /* setProperty with 'important', not style.color: a themesheet's
+             !important rule outranks an ordinary inline declaration, so
+             utton{color:#ff0!important} was winning and painting the label
+             yellow. An important inline value outranks everything. */
+          fab.style.setProperty('color', getComputedStyle(siblingLink).color, 'important');
+        } catch (e) {}
       }
       var node = fab;
       if (/^(UL|OL)$/.test(host.tagName)) {
