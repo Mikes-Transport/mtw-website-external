@@ -1077,24 +1077,28 @@ body.public_index #footer {
     display: none !important;
   }
 
-  /* The CMS emits the button last in the markup, so it renders below the
-     list. Column layout plus order puts it back on top where it belongs,
-     without moving anything in the template. */
+  /* The CMS emits the button last in the markup, so it rendered after the
+     list. Stacked above the logos it landed directly on top of the first
+     one, which read as an accident - so it is a left column instead, with
+     the carousel running to its right. Nothing moves in the template. */
   #home-brands-inner {
     display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 28px !important;
   }
 
   #home-brands-inner a.mtw-brands-btn {
     order: -1 !important;
-    align-self: flex-start !important;
+    flex: 0 0 auto !important;
+    /* the theme's .btn carries margin-top: 30px, which pushed the button
+       30px below the carousel's centre line */
+    margin: 0 !important;
     display: inline-block;
     width: 150px;
     overflow: hidden;
     white-space: nowrap;
     text-align: center;
-    margin-bottom: 20px;
     transition: width 0.25s ease, background-color 0.25s ease;
   }
 
@@ -1105,7 +1109,9 @@ body.public_index #footer {
 
   #home-brands-inner .mtw-marquee {
     display: block;
-    width: 100%;
+    flex: 1 1 auto !important;
+    min-width: 0;
+    width: auto !important;
     overflow: hidden;
   }
 
