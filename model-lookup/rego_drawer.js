@@ -17,16 +17,18 @@
 
        Takes priority over navTarget and floatingButton, both of which are
        fallbacks for when no mount div is found. The icon is placed in flow so
-       the div's own CSS decides how it looks and where it sits. */
-    mount: '#rego-drawer',
+       the div's own CSS decides how it looks and where it sits. Empty, because
+       this site injects into its own nav below. */
+    mount: '',
 
     /* Round icon, fixed to the corner. false = only use data-mtw-rego-open. */
     floatingButton: true,
     position: { right: '20px', bottom: '20px' },
 
     /* Nav mode: a CSS selector. When set, the icon goes inside that element
-       (inheriting its text colour) and the floating icon is not used. */
-    navTarget: '',
+       (inheriting its text colour) and the floating icon is not used. The
+       theme's nav is a <ul>, so the button is wrapped in an <li> to match. */
+    navTarget: '#menu_1',
     navPosition: 'append',
     navLabel: 'My Trailer',
     accent: '#65b746',
@@ -1086,6 +1088,17 @@
     injectStyles();
     /* makeButton adds the navLabel for this class, so don't add it again here. */
     fab = makeButton('mtw-rd-nav');
+
+    /* Themes colour a nav by targeting its links - "#menu_1 > li > a { color:
+       ... }" - so a <button> dropped into the same list inherits the BODY's
+       colour instead and comes out dark on a coloured bar. Take the colour
+       from whatever link is already in there, which matches whatever the theme
+       does rather than hardcoding a guess. */
+    var siblingLink = host.querySelector && host.querySelector('a');
+    if (siblingLink) {
+      try { fab.style.color = getComputedStyle(siblingLink).color; } catch (e) {}
+    }
+
     if (cfg.navPosition === 'prepend') host.insertBefore(fab, host.firstChild);
     else host.appendChild(fab);
     return true;
@@ -1109,6 +1122,12 @@
     if (host) {
       injectStyles();
       fab = makeButton('mtw-rd-nav');
+      /* Same reason as placeInMount: a <button> in the nav would otherwise
+         inherit the body's colour rather than the nav's. */
+      var siblingLink = host.querySelector && host.querySelector('a');
+      if (siblingLink) {
+        try { fab.style.color = getComputedStyle(siblingLink).color; } catch (e) {}
+      }
       var node = fab;
       if (/^(UL|OL)$/.test(host.tagName)) {
         node = el('li', 'mtw-rd-nav-li');

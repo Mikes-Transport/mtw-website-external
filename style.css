@@ -962,16 +962,17 @@ body.public_index #footer {
    width, which is how 7 fitted at every desktop width - handy, but not
    predictable, and it drifted with the viewport rather than stepping.
 
-   Fixed counts per range instead:
+   Fixed counts per range instead, matched to the tile counts below:
      1600+   7 across
      1200-1599  6
      992-1199   5
      768-991    4
      below 768  2
 
-   Note this brings back a wrapped tile: there are 7 tiles, so 6 across
-   leaves one on a second row, and 5 across leaves two. Say the word if
-   the seventh tile should go instead. */
+   At 1600 and above all seven tiles fit one row at 137px or better.
+   Below that the row is trimmed rather than wrapped, so these counts
+   and the hide rules further down are two halves of the same decision
+   - if one changes the other has to change with it. */
 
 .layout_group_14,
 .layout_group_52 {
@@ -1022,8 +1023,11 @@ body.public_index #footer {
 /* Show fewer tiles as the screen narrows, rather than letting the last
    one wrap onto its own row.
 
-   The column counts above line up with these counts exactly, so each
-   width ends up as a single full row:
+   There are two rows, .layout_group_14 and .layout_group_52, identical
+   in shape. Each holds seven tiles: four from the CMS plus three
+   injected by load-css.js. Above the break point all seven sit in one
+   row. Below it the row is trimmed from the tail so it still fits a
+   single row of the width available:
 
      1600+        7 tiles, 7 columns
      1200-1599    6 tiles, 6 columns
@@ -1032,18 +1036,12 @@ body.public_index #footer {
      below 768    4 tiles, 2 columns (two rows, narrow phones)
 
    Hiding by position rather than by the .mtw-cat-placeholder class on
-   purpose: the placeholders only exist because the CMS row is short. Once
-   real tiles are added the same rule trims the row to the same counts,
-   which is what you asked for.
+   purpose: the placeholders only ever existed because the CMS row was
+   short, and there are none now. Hiding by position keeps the count
+   stable now that the tiles are real content.
 
    Only ever hides from the tail, so no earlier tile shifts position when
    the count changes. */
-@media (min-width: 1600px) {
-  .layout_group_14 > :nth-child(n+8),
-  .layout_group_52 > :nth-child(n+8) {
-    display: none !important;
-  }
-}
 
 @media (min-width: 1200px) and (max-width: 1599px) {
   .layout_group_14 > :nth-child(n+7),
@@ -1433,5 +1431,124 @@ body.public_index #footer {
 @media (min-width: 768px) and (max-width: 991px) {
   #home-brands-inner ul.mtw-marquee__track {
     grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+/* ------------------------------------------------------------------
+   Restore the Clearance Products grid.
+
+   This rule was added in f5bd421 and then silently deleted by 482c7e1.
+   That commit rewrote the category grid by replacing everything between
+   the min-width: 992px block and the max-width: 991px block, and this
+   rule had been inserted in between, so it went with them. The Clearance
+   Products list fell back to the theme 325px flow - five across and two
+   rows at 1920, a 1002px block - which is what it went back to looking
+   like.
+
+   Worth being clear which list is which, because the two are easy to
+   confuse and the item counts tuned in load-css.js belong to the other
+   one:
+
+     div.clearance-products > ul.products.clearance   "Clearance Products"
+       10 products, this grid
+     #clearance-right > ul.products.hot             "Hot Products"
+       the Owl carousel, 171px each at 1920
+
+   Ten tiles need 10 x floor + 9 x 6 = 10 x floor + 54, so a 160px floor
+   puts all ten in one row at 1920 and drops to five across at 1024.
+   ------------------------------------------------------------------ */
+
+@media (min-width: 992px) {
+  .clearance-products ul.products.clearance {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+    gap: 6px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+    text-align: left !important;
+  }
+
+  .clearance-products ul.products.clearance > li {
+    float: none !important;
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .clearance-products ul.products.clearance > li > div.details {
+    padding: 0 !important;
+  }
+}
+
+/* The same grid below 992, which had no rule at all and so kept the
+   theme flow: two 139px cards a row but 340px tall each, giving a
+   1644px block on a 390px phone. Cards that size are inherent - image,
+   name, price, ADD TO CART - so the height stays, but they are in two
+   even columns with a gap rather than a ragged flow. */
+@media (max-width: 991px) {
+  .clearance-products ul.products.clearance {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+    text-align: left !important;
+  }
+
+  .clearance-products ul.products.clearance > li {
+    float: none !important;
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .clearance-products ul.products.clearance > li > div.details {
+    padding: 0 !important;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 991px) {
+  .clearance-products ul.products.clearance {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (min-width: 820px) and (max-width: 991px) {
+  .clearance-products ul.products.clearance {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Space around the category block.
+
+   There are two rows here, .layout_group_14 and .layout_group_52, and the
+   gap between them has to match the 6px grid gap inside a row - otherwise
+   the two rows read as two separate blocks with a 36px trench between
+   them, which is what this was doing when both groups carried the 36px.
+
+   So the margin goes on the first row only where it separates rows, and
+   on the second row where it separates the block from the image slider
+   below - that one was measured at 0px before this rule existed, so the
+   two blocks ran together.
+
+     row 1 to row 2   6px, same as between two cards
+     row 2 to slider  36px (24px below 768)
+   ------------------------------------------------------------------ */
+
+.layout_group_14 {
+  margin-bottom: 6px !important;
+}
+
+.layout_group_52 {
+  margin-bottom: 36px !important;
+}
+
+@media (max-width: 767px) {
+  .layout_group_52 {
+    margin-bottom: 24px !important;
   }
 }

@@ -749,3 +749,152 @@
   ready();
   watchBreakpoint();
 })();
+
+/* ------------------------------------------------------------------------
+   Extra homepage category tiles.
+
+   The CMS admin cannot be used to add these, so they are injected here
+   instead. Images and links supplied by the site owner.
+
+   Markup matches what the CMS emits for a real tile - a div holding
+   <p><a><img></a></p> - so the existing tile rules apply to these
+   unchanged and they sit in the row with no special casing:
+
+     <div id="block_13"><p><a href="URL"><img src="IMG" caption="false"
+     alt="..." width="500" height="500" /></a></p></div>
+
+   Any .mtw-cat-placeholder in the row is removed first. categoryPlaceholders
+   stands down on its own once a row has 7 or more children, but which of
+   the two runs first is a race, and losing it would leave three grey
+   "add in CMS" boxes sitting in the middle of real tiles.
+
+   #1 and #5 both link to category/383-mud-flaps-mud-guards. Confirmed as
+   deliberate - two tiles, different artwork, same destination. Left as
+   supplied rather than "corrected".
+
+   The supplied image URLs are absolute, which matters here: the page ships
+   <base href="https://www.mtw.co.nz/">, so any root-relative URL in an
+   injected node resolves against production and 404s on the mirror.
+   ------------------------------------------------------------------------ */
+(function mtwCategoryTiles() {
+  'use strict';
+
+  var MARK = 'data-mtw-extra-tiles';
+  /* There are two category rows on the homepage, each with its own four
+     tiles from the CMS:
+
+       .layout_group_14   Toolboxes, Wheels, Restraint, Plywood
+       .layout_group_52   Brakes, Cleaning, Hazard Gear, Lighting
+
+     Four tiles a row, so three supplied tiles a row makes seven - one
+     full row, which is what the column counts in style.css are set up
+     for at 1600 and above.
+
+     The split is per row on purpose. An earlier version handed all six
+     tiles to both groups, which put the same six on each row. */
+
+  var ROWS = [
+    {
+      group: '.layout_group_14',
+      tiles: [
+        {
+          href: 'https://www.mtw.co.nz/category/383-mud-flaps-mud-guards',
+          img: 'https://d347awuzx0kdse.cloudfront.net/modtransnz/content-file/2026-mtw-categories_09.jpg?v=3f268ecf5f9a0f09d04cc05e5a804a5f5b7e9a6f',
+          alt: 'Mud Flaps / Mud Guards'
+        },
+        {
+          href: 'https://www.mtw.co.nz/category/377-workshop-consumables',
+          img: 'https://d347awuzx0kdse.cloudfront.net/modtransnz/content-file/2026-mtw-categories_10.jpg?v=76531e174a4527b507c65e0f28ee640fdc6dfa95',
+          alt: 'Workshop Consumables'
+        },
+        {
+          href: 'https://www.mtw.co.nz/category/656-exte-logging-parts',
+          img: 'https://d347awuzx0kdse.cloudfront.net/modtransnz/content-file/2026-mtw-categories_11.jpg?v=6e516520df116dfad7eea7b798553b49f5080619',
+          alt: 'ExTeX Logging Parts'
+        }
+      ]
+    },
+    {
+      group: '.layout_group_52',
+      tiles: [
+        {
+          href: 'https://www.mtw.co.nz/category/161-hydraulics',
+          img: 'https://d347awuzx0kdse.cloudfront.net/modtransnz/content-file/2026-mtw-categories_12.jpg?v=e0e436cfef8b61af51c9b93bae387e1c20ea3b53',
+          alt: 'Hydraulics'
+        },
+        {
+          /* Same destination as the first tile on row 1, deliberately. */
+          href: 'https://www.mtw.co.nz/category/383-mud-flaps-mud-guards',
+          img: 'https://d347awuzx0kdse.cloudfront.net/modtransnz/content-file/2026-mtw-categories_13.jpg?v=671441bc059376988e2e740a767acf2081fcf7f9',
+          alt: 'Mud Flaps / Mud Guards'
+        },
+        {
+          href: 'https://www.mtw.co.nz/category/375-tools',
+          img: 'https://d347awuzx0kdse.cloudfront.net/modtransnz/content-file/2026-mtw-categories_14.jpg?v=a6908e990ac980996bba53cd225e86be66c4511f',
+          alt: 'Tools'
+        }
+      ]
+    }
+  ];
+
+  function tile(item) {
+    var box = document.createElement("div");
+    box.className = 'mtw-cat-tile';
+
+    var p = document.createElement("p");
+    var a = document.createElement("a");
+    a.href = item.href;
+
+    var img = document.createElement("img");
+    img.src = item.img;
+    img.alt = item.alt;
+    img.setAttribute("caption", "false");
+    img.width = 500;
+    img.height = 500;
+    /* Keeps the tile square before the image lands, so the row does not
+       reflow as six tiles stream in. */
+    img.style.aspectRatio = "1 / 1";
+    img.style.objectFit = "contain";
+
+    a.appendChild(img);
+    p.appendChild(a);
+    box.appendChild(p);
+    return box;
+  }
+
+  function add() {
+    if (!document.body || !/public_index/.test(document.body.className || '')) return;
+
+    ROWS.forEach(function (row) {
+      [].forEach.call(document.querySelectorAll(row.group), function (group) {
+        if (group.getAttribute(MARK) === 'done') return;
+        group.setAttribute(MARK, 'done');
+
+        /* See the note above: whichever of the two injections gets here
+           first, the placeholders are gone by the time this returns. */
+        [].forEach.call(group.querySelectorAll('.mtw-cat-placeholder'), function (ph) {
+          if (ph.parentNode) ph.parentNode.removeChild(ph);
+        });
+
+        row.tiles.forEach(function (item) { group.appendChild(tile(item)); });
+      });
+    });
+  }
+
+  /* The groups are rebuilt by the CMS layout manager after DOM ready, so
+     wait for them rather than running once and finding nothing. */
+  function wait(tries) {
+    tries = tries || 0;
+    if (document.querySelector('.layout_group_14')) {
+      add();
+      return;
+    }
+    if (tries < 40) setTimeout(function () { wait(tries + 1); }, 250);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { wait(0); });
+  } else {
+    wait(0);
+  }
+})();
