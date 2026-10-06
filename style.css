@@ -956,67 +956,63 @@ body.public_index #footer {
    Below 992 the floor stays at 150px, giving two across on a phone
    rather than the one-wide column a 125px floor would give. */
 
-@media (min-width: 992px) {
+/* Explicit column counts rather than a minmax floor.
+
+   auto-fit worked out the column count from the floor and the container
+   width, which is how 7 fitted at every desktop width - handy, but not
+   predictable, and it drifted with the viewport rather than stepping.
+
+   Fixed counts per range instead:
+     1600+   7 across
+     1200-1599  6
+     992-1199   5
+     768-991    4
+     below 768  2
+
+   Note this brings back a wrapped tile: there are 7 tiles, so 6 across
+   leaves one on a second row, and 5 across leaves two. Say the word if
+   the seventh tile should go instead. */
+
+.layout_group_14,
+.layout_group_52 {
+  display: grid !important;
+  gap: 6px !important;
+  justify-content: normal !important;
+  justify-items: stretch !important;
+}
+
+@media (min-width: 1600px) {
   .layout_group_14,
   .layout_group_52 {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)) !important;
-    gap: 6px !important;
-    justify-content: normal !important;
-    justify-items: stretch !important;
+    grid-template-columns: repeat(7, 1fr) !important;
   }
 }
 
-/* Clearance Products list.
-
-   Worth being clear about what is on this page, because the two product
-   lists are easy to confuse:
-
-     div.clearance-products > ul.products.clearance   "Clearance Products"
-       10 products, static grid, 325px each, about 1000px tall
-
-     #clearance-right > ul.products.hot             "Hot Products"
-       the Owl carousel, 171px each at 1920
-
-   The item counts being tuned in load-css.js are the Hot Products
-   carousel. This rule is the Clearance Products grid, which was still a
-   fixed-size flow at 325px a tile.
-
-   Given the same grid treatment as the category rows. Ten tiles need
-   10 x floor + 9 x 6 = 10 x floor + 54, so a 160px floor lets all ten sit
-   in one row at 1920 and drops to 5 across at 1024. */
-
-@media (min-width: 992px) {
-  .clearance-products ul.products.clearance {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
-    gap: 6px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    list-style: none;
-    text-align: left !important;
-  }
-
-  .clearance-products ul.products.clearance > li {
-    float: none !important;
-    width: auto !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-  }
-
-  .clearance-products ul.products.clearance > li > div.details {
-    padding: 0 !important;
-  }
-}
-@media (max-width: 991px) {
+@media (min-width: 1200px) and (max-width: 1599px) {
   .layout_group_14,
   .layout_group_52 {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
-    gap: 6px !important;
-    justify-content: normal !important;
-    justify-items: stretch !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+  .layout_group_14,
+  .layout_group_52 {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  .layout_group_14,
+  .layout_group_52 {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .layout_group_14,
+  .layout_group_52 {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
