@@ -946,13 +946,36 @@ body.public_index #footer {
    airier.
    ------------------------------------------------------------------ */
 
-.layout_group_14,
-.layout_group_52 {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
-  gap: 6px !important;
-  justify-content: normal !important;
-  justify-items: stretch !important;
+/* Seven tiles need 7 x floor + 6 x 6 = 7 x floor + 36px to fit in one
+   row, so the floor decides how many sit across:
+
+     190px floor -> 7 need 1366px, so 1440 (1265 content) fitted only six
+                   and orphaned the seventh
+     125px floor -> 7 need 911px, which fits from 992 up
+
+   Below 992 the floor stays at 150px, giving two across on a phone
+   rather than the one-wide column a 125px floor would give. */
+
+@media (min-width: 992px) {
+  .layout_group_14,
+  .layout_group_52 {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)) !important;
+    gap: 6px !important;
+    justify-content: normal !important;
+    justify-items: stretch !important;
+  }
+}
+
+@media (max-width: 991px) {
+  .layout_group_14,
+  .layout_group_52 {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+    gap: 6px !important;
+    justify-content: normal !important;
+    justify-items: stretch !important;
+  }
 }
 
 .layout_group_14 > *,
@@ -1094,12 +1117,24 @@ body.public_index #footer {
     /* the theme's .btn carries margin-top: 30px, which pushed the button
        30px below the carousel's centre line */
     margin: 0 !important;
-    display: inline-block;
+    /* Two stacked words, centred. Height is 70px: 38px read as a stray
+       button, and matching the 124px logo height was far too much - a
+       block as tall as the logos beside it. */
+    display: inline-flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 70px !important;
     width: 150px;
     overflow: hidden;
     white-space: nowrap;
-    text-align: center;
+    text-align: center !important;
     transition: width 0.25s ease, background-color 0.25s ease;
+  }
+
+  #home-brands-inner a.mtw-brands-btn .mtw-brands-btn__w {
+    display: block;
+    line-height: 1.2;
   }
 
   #home-brands-inner a.mtw-brands-btn:hover,

@@ -324,8 +324,8 @@
    so nothing about the carousels changes except how many show. Anything
    less and the re-init would silently drop the theme's behaviour.
 
-   The scale tops out at 9 cards at 1920 and works back down from there:
-     2200:10   1920:9   1600:7   1200:5   1000:4   600:2   0:1
+   The scale tops out at 10 cards at 1920 and works back down from there:
+     2200:10  1920:10  1600:9  1440:8  1200:7  1000:5  600:2  0:1
 
    Both carousels are optional. If Owl never loads, or the theme markup is
    absent, this quietly does nothing.
@@ -342,16 +342,16 @@
     {
       selector: 'body.public_index .featured-products ul',
       responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
-                    1000: { items: 6, nav: true }, 1200: { items: 8, nav: true },
-                    1600: { items: 10, nav: true }, 1920: { items: 12, nav: true },
-                    2200: { items: 14, nav: true } }
+                    1000: { items: 5, nav: true }, 1200: { items: 7, nav: true },
+                    1440: { items: 8, nav: true }, 1600: { items: 9, nav: true },
+                    1920: { items: 10, nav: true }, 2200: { items: 10, nav: true } }
     },
     {
       selector: 'body.public_index #clearance-right ul',
       responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
-                    1000: { items: 6, nav: true }, 1200: { items: 8, nav: true },
-                    1600: { items: 10, nav: true }, 1920: { items: 12, nav: true },
-                    2200: { items: 14, nav: true } }
+                    1000: { items: 5, nav: true }, 1200: { items: 7, nav: true },
+                    1440: { items: 8, nav: true }, 1600: { items: 9, nav: true },
+                    1920: { items: 10, nav: true }, 2200: { items: 10, nav: true } }
     }
   ];
 
@@ -580,7 +580,15 @@
     var btn = inner.querySelector('a.btn');
     if (btn && !btn.classList.contains('mtw-brands-btn')) {
       btn.classList.add('mtw-brands-btn');
-      btn.textContent = 'Our Brands';
+      /* Split onto two lines. Built as elements rather than by inserting
+         markup, so the words are set as text and cannot be mangled. */
+      btn.textContent = '';
+      ['Our', 'Brands'].forEach(function (word) {
+        var w = document.createElement('span');
+        w.className = 'mtw-brands-btn__w';
+        w.textContent = word;
+        btn.appendChild(w);
+      });
     }
 
     var source = inner.querySelector('ul.tag-values');
