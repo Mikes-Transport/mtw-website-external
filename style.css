@@ -1016,6 +1016,53 @@ body.public_index #footer {
   }
 }
 
+/* Show fewer tiles as the screen narrows, rather than letting the last
+   one wrap onto its own row.
+
+   The column counts above line up with these counts exactly, so each
+   width ends up as a single full row:
+
+     1600+        7 tiles, 7 columns
+     1200-1599    6 tiles, 6 columns
+     992-1199     5 tiles, 5 columns
+     768-991      4 tiles, 4 columns
+     below 768    4 tiles, 2 columns (two rows, narrow phones)
+
+   Hiding by position rather than by the .mtw-cat-placeholder class on
+   purpose: the placeholders only exist because the CMS row is short. Once
+   real tiles are added the same rule trims the row to the same counts,
+   which is what you asked for.
+
+   Only ever hides from the tail, so no earlier tile shifts position when
+   the count changes. */
+@media (min-width: 1600px) {
+  .layout_group_14 > :nth-child(n+8),
+  .layout_group_52 > :nth-child(n+8) {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1599px) {
+  .layout_group_14 > :nth-child(n+7),
+  .layout_group_52 > :nth-child(n+7) {
+    display: none !important;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+  .layout_group_14 > :nth-child(n+6),
+  .layout_group_52 > :nth-child(n+6) {
+    display: none !important;
+  }
+}
+
+@media (max-width: 991px) {
+  .layout_group_14 > :nth-child(n+5),
+  .layout_group_52 > :nth-child(n+5) {
+    display: none !important;
+  }
+}
+
 .layout_group_14 > *,
 .layout_group_52 > * {
   flex: none !important;
