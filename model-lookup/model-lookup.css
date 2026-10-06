@@ -107,8 +107,8 @@
   flex: 0 0 auto;
   height: 44px;
   padding: 0 18px;
-  background: #12171f;
-  color: #ffffff;
+  background: #65b746;
+  color: white;
   border-radius: 8px !important;
 }
 .mtw-ml__search button:hover { background: #2a323d; }
@@ -116,13 +116,13 @@
 .mtw-ml__add {
   height: 44px;
   padding: 0 22px;
-  background: var(--ml-accent);
-  color: #07111f;
+  background: #65b746;
+  color: white !important;
    border-radius: 8px !important;
 }
 .mtw-ml__add:hover:not(:disabled) { background: #46a6f5; }
 .mtw-ml__add:disabled { background: #eef1f5; color: #aab4c2; cursor: not-allowed; }
-.mtw-ml__add.is-done { background: #4ade80; }
+.mtw-ml__add.is-done { background: #73cf50; color: white;}
 
 /* --- result card -------------------------------------------------------- */
 
