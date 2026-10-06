@@ -184,6 +184,11 @@
 
 .mtw-ml__svg { display: block; width: 100%; height: auto; }
 
+/* The artwork itself. All 27 drawings are 1800x600 with a transparent
+   background, and the viewBox matches that exactly, so hotspot coordinates
+   from trailers.json need no scaling. */
+.mtw-ml__drawing { pointer-events: none; }
+
 /* A small card tucked into the corner of the drawing, not a panel across
    the bottom of it. Bounded on both axes and scrollable, so a component with
    eight spec rows cannot swallow the trailer it is describing. */
@@ -245,24 +250,11 @@
 }
 .mtw-ml__float-close:hover { background: var(--ml-sunken); color: var(--ml-ink); }
 
-/* --- diagram strokes ----------------------------------------------------- */
-
-.mtw-ml__line { stroke: #aab4c2; stroke-width: 2; }
-.mtw-ml__line--rail { stroke: var(--ml-accent); stroke-width: 4; }
-.mtw-ml__line--drawbar { stroke: var(--ml-accent); stroke-width: 3; }
-.mtw-ml__line--rib { stroke: #dde3ea; stroke-width: 2; }
-.mtw-ml__line--divider { stroke: var(--ml-line-2); stroke-width: 2; }
-.mtw-ml__line--ground { stroke: #dde3ea; stroke-width: 2; }
-.mtw-ml__line--leg { stroke: var(--ml-muted); stroke-width: 3; }
-
-.mtw-ml__body { fill: #f7f9fb; stroke: #aab4c2; stroke-width: 2; }
-.mtw-ml__flag { fill: #f87171; }
-.mtw-ml__hitch { fill: var(--ml-sunken); stroke: var(--ml-muted); stroke-width: 2; }
-.mtw-ml__wheel { fill: #ffffff; stroke: var(--ml-ink); stroke-width: 2.5; }
-.mtw-ml__hub { fill: var(--ml-accent); }
-
-/* Highlighted span on the rail, from the reference drawing. */
-.mtw-ml__highlight { stroke: #fbbf24; stroke-width: 4; }
+/* The trailer is a PNG now, so there are no vector strokes to style here. The
+   rules that used to draw the body panel, ribs, rail, drawbar, wheels and
+   hub were removed along with the shapes that emitted them - they were the
+   placeholder artwork, and leaving them behind would only mislead anyone
+   reading this later. */
 
 /* --- hotspot markers ----------------------------------------------------- */
 
@@ -270,21 +262,24 @@
   cursor: pointer;
   fill: var(--ml-accent);
   stroke: #ffffff;
-  stroke-width: 2;
+  stroke-width: 7;
   transition: fill 0.15s ease;
 }
 .mtw-ml__hot:hover { fill: #46a6f5; }
 .mtw-ml__hot.is-active { fill: var(--ml-ink); filter: drop-shadow(0 0 5px rgba(90, 176, 255, 0.9)); }
 
-.mtw-ml__hot-group.is-empty .mtw-ml__hot { fill: #ffffff; stroke: var(--ml-line-2); stroke-width: 1.5; }
-.mtw-ml__hot-group.is-empty.is-active .mtw-ml__hot { fill: #ffffff; stroke: var(--ml-muted); stroke-width: 2.5; }
+.mtw-ml__hot-group.is-empty .mtw-ml__hot { fill: #ffffff; stroke: var(--ml-line-2); stroke-width: 6; }
+.mtw-ml__hot-group.is-empty.is-active .mtw-ml__hot { fill: #ffffff; stroke: var(--ml-muted); stroke-width: 10; }
 
 /* A short tick from the active dot down toward the card. Not an arrowhead -
    it marks the direction without decorating the drawing. */
+/* The drawing's viewBox is 1800x600 now, not the 520x230 it used to be, so
+   every stroke width below is in a space roughly 3.5x larger. They are scaled
+   to match rather than left at the old values, which would render as hairlines. */
 .mtw-ml__leader {
   fill: none;
   stroke: var(--ml-ink);
-  stroke-width: 2.5;
+  stroke-width: 9;
   stroke-linecap: round;
   opacity: 0;
   transition: opacity 0.18s ease;
@@ -316,7 +311,12 @@
   gap: 12px;
   align-items: flex-start;
 }
-.mtw-ml__split > * { flex: 1 1 0; min-width: 0; height: 273px;}
+/* The columns are a fixed height so the build sheet scrolls inside its own
+   panel. Letting it grow to its full ~880px pushed the parts grid a long way
+   down the page and made the trailer panel taller than anything else on it.
+   273px suits the 3:1 drawings: the image is letterboxed into it with room
+   either side, and the sheet stays a compact scrollable column. */
+.mtw-ml__split > * { flex: 1 1 0; min-width: 0; height: 273px; }
 
 .mtw-ml__side {
   display: flex;

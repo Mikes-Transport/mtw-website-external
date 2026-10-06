@@ -92,6 +92,22 @@
     cartSelector: '.cart-outer',
     cartParts: ['.items', '.total'],
 
+    /* Trailer drawings. trailers.json maps the CSV's trailer_type strings onto
+       the PNGs and holds the hotspot coordinates; imgBase points at the PNGs
+       themselves. Set imgBase to '' to serve them from the widget's own
+       directory. */
+    trailerMapUrl: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/img/trailers.json',
+    imgBase: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/img/',
+
+    /* Clickable component dots on the drawing, and the card that opens over it.
+       Off for now. The points in img/trailers.json are geometric estimates
+       rather than measured geometry - they assume axles sit at the rear right,
+       which is true of a semi transporter and not of a tipper with no
+       gooseneck - and a dot pointing at empty space is worse than no dot. The
+       code and the data are all still here; turning this on needs the points
+       corrected in trailers.json first. */
+    hotspots: false,
+
     /* Look each stock code up through the shop's own search as the visitor
        needs it, rather than shipping a prebuilt index.
 
@@ -700,36 +716,7 @@
     document.head.appendChild(link);
   }
 
-  /* --- trailer diagram --------------------------------------------------- */
-
-  /* Diagram shape from the type string. The file has 1,064 distinct
-     trailer_type values; among rows that have parts there are 26, falling into
-     these. Anything unrecognised draws as a plain deck rather than something
-     misleading. */
-  function archetype(type) {
-    var t = String(type || '');
-    var a = { body: 'deck', wings: false, neck: false, hopper: false, cabin: false, kingpin: true };
-    if (/\bdolly\b/i.test(t)) { a.body = 'dolly'; a.kingpin = false; }
-    else if (/clip[\s-]?on/i.test(t)) { a.body = 'clipon'; a.kingpin = false; }
-    else if (/b[\s-]?train/i.test(t)) { a.neck = true; }
-    else if (/widen|FTLL|flat top low loader/i.test(t)) { a.wings = true; }
-    else if (/link\s?wing|\bLW1\b|\bXHN\b/i.test(t)) { a.wings = true; }
-    else if (/tipper|dumper|bin|tanker|tank\b/i.test(t)) { a.hopper = true; }
-    else if (/house trailer|jack(ing)? plant/i.test(t)) { a.cabin = true; }
-    return a;
-  }
-
-  /* Leading number of a type string: "3A Semi Transporter" -> 3,
-     "2R8 Dolly" -> 2, "5 Axle B-Train" -> 5. */
-  function axleCount(type, fallback) {
-    var t = String(type || '').trim();
-    var m = t.match(/^(\d)\s*(?:[AR]\s*(\d))?[A-Za-z]/) || t.match(/(\d)\s*axle/i);
-    if (m) {
-      var n = parseInt(m[1], 10);
-      if (n >= 1 && n <= 9) return n;
-    }
-    return fallback || 3;
-  }
+  /* --- drawings ---------------------------------------------------------- */
 
   /* Hotspots. Each carries the build-sheet fields for that component. These
      are spec columns only - nothing here is ever treated as a part number,
@@ -745,95 +732,58 @@
     { id: 'wheels', label: 'Axles & wheels', keys: ['axle', 'rare_axle', 'tyre_type_and_size', 'wheel_type_and_size', 'hub', 'bearing_inner', 'bearing_outer', 'seal', 'drum'] }
   ];
 
-  /* Geometry follows the reference drawing: a 520x230 side view with the blue
-     drawbar and rail, a panelled body with ribs, a red rear marker, and
-     wheels drawn as a light disc with a dark rim and a blue hub. Axle count
-     and body shape come from the trailer type. */
+  /* Picks the drawing for a trailer type from img/trailers.json.
+     Returns null when nothing matches, which is a normal case: three of the
+     searchable types (two clip-ons and a 3FTLL) have no artwork, and the
+     caller falls back to the build sheet on its own. */
+  function drawingFor(type) {
+    var map = state.trailers;
+    if (!map || !map.match) return null;
+
+    /* Compared the way the customer types it: letters and digits only, so
+       "6A B-Train (3A Front Unit) - NZ" and "6A B-Train" both reach the same
+       rule. */
+    var n = String(type || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!n) return null;
+
+    for (var i = 0; i < map.match.length; i++) {
+      var rule = map.match[i];
+      if (!rule.re) continue;
+      var re;
+      try { re = new RegExp(rule.re, 'i'); } catch (e) { continue; }
+      if (!re.test(n)) continue;
+      var img = map.images[rule.image];
+      if (!img) { warn('matched rule points at a missing drawing:', rule.image); continue; }
+      return { slug: rule.image, confidence: rule.confidence || 'exact', spec: img };
+    }
+    return null;
+  }
+
+  /* The drawing, with the hotspots drawn on top of it.
+
+     The artwork stays a PNG and is placed inside the SVG with <image>, rather
+     than being rebuilt as vector shapes. That keeps every existing behaviour -
+     the dots, the active state, the leader tick, the floating card - working
+     untouched, and the viewBox is the PNG's own 1800x600 so hotspot
+     coordinates are straight from trailers.json with no scaling. */
   function buildSvg(rec) {
-    var a = archetype(rec.type);
-    var n = Math.max(2, Math.min(6, axleCount(rec.type, 3)));
+    var d = drawingFor(rec.type);
     var p = [];
 
-    /* Proportioned to the reference drawing: a shallow box sitting just above a
-       tight wheel pair, not a tall slab with a lot of empty panel in it.
-       viewBox is 520x230 and the whole trailer sits inside y 50-215. */
-    var bodyX = 96, bodyY = 70, bodyW = 330, bodyH = 74, railY = 158;
-    var wheelY = 182, wheelR = 18;
-
-    if (a.body === 'dolly') { bodyX = 250; bodyW = 210; }
-    if (a.body === 'clipon') { bodyX = 180; bodyW = 270; }
-
-    /* Wheels under the rear of the body, clear of each other and of the rail.
-       Spacing must clear the diameter plus a gap, or they fuse into a blob. */
-    var wheels = [];
-    var gap = wheelR * 2 + 12;
-    for (var i = 0; i < n; i++) wheels.push(bodyX + bodyW - 58 - i * gap);
-
-    p.push('<svg class="mtw-ml__svg" viewBox="0 0 520 230" role="img" aria-label="' +
+    p.push('<svg class="mtw-ml__svg" viewBox="0 0 1800 600" role="img" aria-label="' +
       (rec.type || 'Trailer') + ' side view">');
 
-    p.push('<path d="M20 206H500" class="mtw-ml__line mtw-ml__line--ground"/>');
-
-    /* body panel, divider and ribs */
-    p.push('<rect x="' + bodyX + '" y="' + bodyY + '" width="' + bodyW + '" height="' + bodyH +
-      '" rx="8" class="mtw-ml__body"/>');
-    p.push('<path d="M' + bodyX + ' ' + (bodyY + 26) + 'H' + (bodyX + bodyW) +
-      '" class="mtw-ml__line mtw-ml__line--divider"/>');
-
-    /* Two ribs only. The reference drawing has four, but on a body this shallow
-       more than two turns the panel into graph paper. */
-    var ribs = [];
-    for (var r = bodyX + 82; r < bodyX + bodyW - 50; r += 110) {
-      ribs.push('M' + r + ' ' + bodyY + 'V' + (bodyY + bodyH));
-    }
-    if (ribs.length) p.push('<path d="' + ribs.join(' ') + '" class="mtw-ml__line mtw-ml__line--rib"/>');
-
-    if (a.hopper) {
-      p.push('<path d="M' + (bodyX + 4) + ' ' + bodyY + 'V52H' + (bodyX + bodyW - 4) +
-        'V' + bodyY + '" class="mtw-ml__line"/>');
-    }
-    if (a.cabin) {
-      p.push('<rect x="' + (bodyX + 10) + '" y="38" width="100" height="32" rx="7" class="mtw-ml__body"/>');
-    }
-    if (a.wings) {
-      p.push('<path d="M' + (bodyX + 20) + ' ' + bodyY + 'V54H' + (bodyX + bodyW - 20) +
-        'V' + bodyY + '" class="mtw-ml__line mtw-ml__line--rib"/>');
+    if (d) {
+      p.push('<image class="mtw-ml__drawing" x="0" y="0" width="1800" height="600"' +
+        ' preserveAspectRatio="xMidYMid meet"' +
+        ' href="' + cfg.imgBase + d.slug + '.png"/>');
     }
 
-    /* rear marker, as the reference draws it */
-    p.push('<rect x="' + (bodyX + bodyW - 5) + '" y="' + (bodyY + 34) +
-      '" width="11" height="20" rx="3" class="mtw-ml__flag"/>');
-
-    if (a.kingpin) {
-      p.push('<path d="M' + bodyX + ' ' + railY + 'L' + (bodyX - 44) +
-        ' 180" class="mtw-ml__line mtw-ml__line--drawbar"/>');
-      p.push('<path d="M' + (bodyX - 36) + ' 173V188" class="mtw-ml__line mtw-ml__line--leg"/>');
-      p.push('<circle cx="' + (bodyX - 36) + '" cy="190" r="5" class="mtw-ml__hitch"/>');
-    }
-    p.push('<path d="M' + bodyX + ' ' + railY + 'H' + (bodyX + bodyW + 12) +
-      '" class="mtw-ml__line mtw-ml__line--rail"/>');
-
-    /* highlighted span, sitting on the rail */
-    p.push('<path d="M' + (bodyX + bodyW - 130) + ' ' + (railY - 3) + 'H' +
-      (bodyX + bodyW - 80) + '" class="mtw-ml__highlight"/>');
-
-    /* landing legs */
-    p.push('<path d="M' + (bodyX + 34) + ' ' + railY + 'V' + (railY + 18) + 'M' +
-      (bodyX + 45) + ' ' + railY + 'V' + (railY + 18) + '" class="mtw-ml__line mtw-ml__line--leg"/>');
-
-    wheels.forEach(function (cx) {
-      p.push('<circle cx="' + cx + '" cy="' + wheelY + '" r="' + wheelR + '" class="mtw-ml__wheel"/>');
-      p.push('<circle cx="' + cx + '" cy="' + wheelY + '" r="6" class="mtw-ml__hub"/>');
-    });
-
-    var geo = {
-      bodyX: bodyX, bodyY: bodyY, bodyW: bodyW, bodyH: bodyH,
-      railY: railY, wheelY: wheelY, wheelR: wheelR
-    };
-
-    p.push(HOTSPOTS.map(function (h) {
-      return hotspot(h, a, wheels, geo);
-    }).join(''));
+    /* Dots are skipped when there is no drawing to point at, and entirely while
+       cfg.hotspots is off. A dot floating on empty canvas reads as a mistake. */
+    p.push(d && cfg.hotspots ? HOTSPOTS.map(function (h) {
+      return hotspot(h, d.spec);
+    }).join('') : '');
 
     /* Short tick from the active dot down toward the card. Redrawn on every
        click rather than shipped empty, so there is nothing to show before a
@@ -844,47 +794,22 @@
     return p.join('');
   }
 
-  /* Small dots in the drawing's own accent, so they read as part of the
-     artwork rather than a layer sitting on top of it.
-
-     Each is nudged onto the thing it names, and the leader anchor sits above
-     the dot so the arrow never crosses the drawing to get to the panel. */
-  /* g carries the shared drawing geometry. Passing one object rather than nine
-     positional arguments, because dropping one of them silently breaks every
-     marker instead of failing loudly. */
-  function hotspot(h, a, wheels, g) {
-    var rear = wheels[0], front = wheels[wheels.length - 1];
-    var bodyX = g.bodyX, bodyW = g.bodyW, bodyY = g.bodyY, bodyH = g.bodyH;
-    var railY = g.railY, wheelY = g.wheelY, wheelR = g.wheelR;
-
-    /* Each dot sits on the thing it names, spread along the trailer so they
-       do not pile up at the rear axle. Brakes sit low on the suspension,
-       wheels on the hub, and both anchor below so their leader arrow leaves
-       downward rather than through the tyre. */
-    var spots = {
-      body: { x: bodyX + bodyW * 0.26, y: bodyY + 16 },
-      kingpin: a.kingpin ? { x: bodyX - 36, y: 190 } : { x: bodyX + 30, y: bodyY + bodyH - 10 },
-      front: { x: bodyX + 34, y: 182 },
-      mid: { x: bodyX + bodyW * 0.58, y: bodyY + bodyH - 9 },
-      widening: a.wings ? { x: bodyX + bodyW * 0.78, y: 54 } : null,
-      suspension: { x: bodyX + bodyW * 0.80, y: railY + 3 },
-      /* On the hub of the leading and trailing wheels respectively, nudged
-         apart so two dots never land on one tyre. */
-      brakes: { x: front, y: wheelY },
-      wheels: { x: rear, y: wheelY }
-    };
-
-    var s = spots[h.id];
+  /* Where each dot sits comes from trailers.json, measured against that
+     drawing's own bounding box - the drawings are not drawn to a common frame,
+     so fixed canvas coordinates would miss on most of them. */
+  function hotspot(h, spec) {
+    var spots = spec.hotspots || [];
+    var s = spots.filter(function (v) { return v.id === h.id; })[0];
     if (!s) return '';
 
     var present = hasAny(rec2specsCache, h.keys);
-    var r = 8;
 
-    /* No text label. The card that appears on click says what the component is,
-       and repeating it on the drawing as well was noise. */
+    /* Dots are sized in canvas units and the viewBox scales, so a radius is
+       chosen to land near 9px on screen at the usual column width. */
+    var r = 26;
     return '<g class="mtw-ml__hot-group' + (present ? ' is-recorded' : ' is-empty') + '"' +
       ' data-mtw-ml-group="' + h.id + '"' +
-      ' data-anchor-x="' + s.x + '" data-anchor-y="' + (s.y + r + 2) + '">' +
+      ' data-anchor-x="' + s.x + '" data-anchor-y="' + (s.y + r + 6) + '">' +
       '<circle class="mtw-ml__hot" cx="' + s.x + '" cy="' + s.y + '" r="' + r +
       '" data-mtw-ml-hot="' + h.id + '"/>' +
       '</g>';
@@ -1105,11 +1030,17 @@
     viewer.innerHTML = buildSvg(rec);
 
     /* The component card floats over the drawing. Selecting a part then
-       explains itself in place instead of shoving the page around. */
-    var float = el('div', 'mtw-ml__float');
-    float.id = 'mtw-ml-float';
-    float.hidden = true;
-    viewer.appendChild(float);
+       explains itself in place instead of shoving the page around.
+
+       Skipped entirely while cfg.hotspots is off - there is nothing to open
+       it from, so it would only add an empty panel and a height mismatch
+       against the build sheet beside it. */
+    if (cfg.hotspots) {
+      var float = el('div', 'mtw-ml__float');
+      float.id = 'mtw-ml-float';
+      float.hidden = true;
+      viewer.appendChild(float);
+    }
 
     Array.prototype.forEach.call(viewer.querySelectorAll('[data-mtw-ml-hot]'), function (shape) {
       shape.addEventListener('click', function () {
@@ -1123,9 +1054,10 @@
     renderBuildSheet(side, rec);
     split.appendChild(side);
 
-    /* Match the information column to the drawing's height, whatever the
-       trailer type. Measured after layout, because the drawing scales with
-       the column width. Re-run on resize. */
+    /* Cap the information column to the drawing's height so the sheet scrolls
+       inside its own panel rather than stretching the whole panel down.
+       Measured after layout, because the drawing scales with the column width.
+       Re-run on resize. */
     function matchHeights() {
       var h = Math.round(viewer.getBoundingClientRect().height);
       var body = side.querySelector('.mtw-ml__more-body');
@@ -1168,12 +1100,15 @@
     if (group) group.classList.add('is-active');
 
     /* Tick from the dot down to the card. Kept short and inside the drawing
-       so it points at the card rather than travelling across the trailer. */
+       so it points at the card rather than travelling across the trailer.
+       Length is in the 1800x600 viewBox's units, not pixels - the old
+       16 px tick was tuned for a 520-wide viewBox and would be invisible
+       here. */
     var leader = viewer.querySelector('#mtw-ml-leader');
     if (leader && group) {
       var ax = parseFloat(group.getAttribute('data-anchor-x'));
       var ay = parseFloat(group.getAttribute('data-anchor-y'));
-      leader.setAttribute('d', 'M' + ax + ' ' + ay + ' L' + ax + ' ' + (ay + 16));
+      leader.setAttribute('d', 'M' + ax + ' ' + ay + ' L' + ax + ' ' + (ay + 52));
       leader.classList.remove('is-drawn');
       void leader.getBoundingClientRect();
       leader.classList.add('is-drawn');
@@ -1639,7 +1574,7 @@
     loadCss();
     loadFonts();
 
-    var box = el('div', 'mtw-ml');
+    var box = el('div', 'mtw-ml' + (cfg.hotspots ? '' : ' mtw-ml--no-hotspots'));
     host.appendChild(box);
 
     /* Search first, then results. renderSearch appends to box, so it has to
@@ -1742,9 +1677,16 @@
       });
     }
 
-    /* Only the CSV is fetched up front. The product index, if one is being
-       used, loads alongside it. */
-    var boot = [getText(cfg.csvUrl)];
+    /* The CSV and the drawing map load together. Neither is needed for a trailer
+       to be found, so a failure in the map must not take the whole widget down
+       with it - the build sheet is still worth showing without a drawing. */
+    var boot = [
+      getText(cfg.csvUrl),
+      getJson(cfg.trailerMapUrl).catch(function (e) {
+        warn('no trailer drawings:', e && e.message);
+        return null;
+      })
+    ];
     if (!cfg.lookupOnDemand && cfg.lookupIndexUrl) boot.push(getJson(cfg.lookupIndexUrl));
 
     Promise.all(boot).then(function (both) {
@@ -1756,7 +1698,8 @@
       state = {
         records: shaped.index,
         fields: shaped.fields,
-        index: cfg.lookupOnDemand ? {} : shapeIndex(both[1]),
+        trailers: both[1],
+        index: cfg.lookupOnDemand ? {} : shapeIndex(both[2]),
         qty: {},
         rego: ''
       };
