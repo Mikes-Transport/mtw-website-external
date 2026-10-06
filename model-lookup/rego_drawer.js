@@ -10,6 +10,16 @@
     /* Where "View all parts" goes. Gets ?rego=XXXX appended. */
     regoPageUrl: 'page/19/testing-page',
 
+    /* Where the icon goes. A CSS selector for a div the page provides:
+
+         <div id="rego-drawer"></div>
+         <script src=".../rego_drawer.js"></script>
+
+       Takes priority over navTarget and floatingButton, both of which are
+       fallbacks for when no mount div is found. The icon is placed in flow so
+       the div's own CSS decides how it looks and where it sits. */
+    mount: '#rego-drawer',
+
     /* Round icon, fixed to the corner. false = only use data-mtw-rego-open. */
     floatingButton: true,
     position: { right: '20px', bottom: '20px' },
@@ -18,8 +28,8 @@
        (inheriting its text colour) and the floating icon is not used. */
     navTarget: '',
     navPosition: 'append',
-    navLabel: '',
-    accent: '#d71920',
+    navLabel: 'My Trailer',
+    accent: '#65b746',
     zIndex: 99999,
 
     label: 'Find your trailer by registration',
@@ -1059,6 +1069,28 @@
     return b;
   }
 
+  /* The page-provided mount div. No retry loop is needed here, unlike navTarget:
+     the div is static markup that exists by the time start() runs, whereas a
+     nav target is usually rendered by the theme after DOMContentLoaded.
+
+     The button is the in-flow (mtw-rd-nav) variant, not the floating one -
+     the fab is position:fixed and would ignore the div entirely. */
+  function placeInMount() {
+    var host = null;
+    try { host = document.querySelector(cfg.mount); } catch (e) {
+      warn('mount is not a valid selector:', cfg.mount);
+      return false;
+    }
+    if (!host) return false;
+
+    injectStyles();
+    /* makeButton adds the navLabel for this class, so don't add it again here. */
+    fab = makeButton('mtw-rd-nav');
+    if (cfg.navPosition === 'prepend') host.insertBefore(fab, host.firstChild);
+    else host.appendChild(fab);
+    return true;
+  }
+
   function placeFloating() {
     injectStyles();
     fab = makeButton('mtw-rd-fab');
@@ -1097,8 +1129,13 @@
   }
 
   function start() {
-    if (cfg.navTarget) placeInNav(20);
-    else if (cfg.floatingButton) placeFloating();
+    /* Mount div first: it is the most specific instruction the page can give.
+       Falls through to the existing nav and floating behaviour when absent, so
+       an existing setup is unaffected. */
+    if (!placeInMount()) {
+      if (cfg.navTarget) placeInNav(20);
+      else if (cfg.floatingButton) placeFloating();
+    }
 
     /* Any element can open it. Delegated, so triggers added later still work. */
     document.addEventListener('click', function (e) {
