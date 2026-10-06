@@ -567,6 +567,15 @@
   var LIST_MARK = 'data-mtw-source';
   var TRACK_MARK = 'data-mtw-marquee';
 
+  /* Below this the strip is too narrow to scroll usefully, so the logos
+     become a plain grid instead. Mirrors the 992px boundary in
+     style.css - kept as two literals so this file stands alone. */
+  var MOBILE_MAX = 991;
+
+  function isWide() {
+    return window.innerWidth > MOBILE_MAX;
+  }
+
   function reduced() {
     return !!(window.matchMedia &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -609,13 +618,18 @@
       track.className = 'mtw-marquee__track';
       track.setAttribute(TRACK_MARK, 'built');
 
-      /* Two identical runs: originals, then clones. */
       shown.forEach(function (li) { track.appendChild(li.cloneNode(true)); });
-      shown.forEach(function (li) {
-        var copy = li.cloneNode(true);
-        copy.classList.add('mtw-marquee__clone');
-        track.appendChild(copy);
-      });
+
+      /* A second run only makes sense for the scrolling strip. On a narrow
+         screen the logos are a grid, and cloning them there duplicated
+         every brand. */
+      if (isWide()) {
+        shown.forEach(function (li) {
+          var copy = li.cloneNode(true);
+          copy.classList.add('mtw-marquee__clone');
+          track.appendChild(copy);
+        });
+      }
 
       wrap.appendChild(track);
       source.parentNode.insertBefore(wrap, source);
@@ -642,6 +656,12 @@
     var parts = build();
     if (!parts || !parts.track) return;
     var track = parts.track;
+
+    /* Narrow: static grid, no transform, nothing to animate. */
+    if (!isWide()) {
+      track.style.transform = '';
+      return;
+    }
 
     var half = runWidth(track);
     if (!half) return;
@@ -696,5 +716,36 @@
     }
   }
 
+  /* Crossing the breakpoint either way has to add or drop the clones, so
+     watch for it rather than only re-measuring the run width. */
+  function watchBreakpoint() {
+    var wasWide = isWide();
+    var t = null;
+    window.addEventListener('resize', function () {
+      if (isWide() === wasWide) return;
+      wasWide = isWide();
+      clearTimeout(t);
+      t = setTimeout(function () {
+        var track = document.querySelector('#home-brands-inner .mtw-marquee__track');
+        if (!track) return;
+        var clones = track.querySelectorAll('li.mtw-marquee__clone');
+        if (wasWide && !clones.length) {
+          [].forEach.call([].slice.call(track.children), function (li) {
+            var copy = li.cloneNode(true);
+            copy.classList.add('mtw-marquee__clone');
+            track.appendChild(copy);
+          });
+          start();
+        } else if (!wasWide && clones.length) {
+          [].forEach.call(clones, function (li) {
+            if (li.parentNode) li.parentNode.removeChild(li);
+          });
+          track.style.transform = '';
+        }
+      }, 250);
+    });
+  }
+
   ready();
+  watchBreakpoint();
 })();

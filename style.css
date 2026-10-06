@@ -1002,7 +1002,10 @@ body.public_index #footer {
   }
 }
 
-@media (min-width: 768px) and (max-width: 991px) {
+/* Four from 700 rather than 768: at 767 three columns gave 221px tiles
+   and a 1073px block, which is nearly as bad as the five rows it was
+   meant to avoid. */
+@media (min-width: 700px) and (max-width: 991px) {
   .layout_group_14,
   .layout_group_52 {
     grid-template-columns: repeat(4, 1fr) !important;
@@ -1306,5 +1309,129 @@ body.public_index #footer {
      more nuisance than it is worth. */
   #home-brands-inner a.mtw-brands-btn {
     margin-bottom: 16px;
+  }
+}
+/* ------------------------------------------------------------------
+   Brands on narrow screens.
+
+   Everything above sits inside min-width: 992px, so below that the
+   theme got its own way back and the block was 3781px tall at 390px:
+   ten full-width tiles stacked one under another, every one carrying
+   its caption and a VIEW button, on the grey band, with "Our Brands"
+   printed twice - once by the h2 and once by the button.
+
+   Below 992 the strip becomes a plain grid instead of scrolling, which
+   is what load-css.js sets up: it only clones the logos for the second
+   run when the screen is wide enough to scroll, so here there are ten
+   tiles and no duplicates.
+
+   The tile is just the logo here too, for the same reason as on the
+   strip - the caption and the VIEW button are per-tile furniture that
+   only makes sense when a tile is a destination of its own.
+
+   The h2 goes and the button keeps the words, matching the desktop
+   arrangement where the button is the heading. Two columns on a
+   phone, three from 480, four from 768.
+   ------------------------------------------------------------------ */
+
+@media (max-width: 991px) {
+  #home-brands {
+    background: transparent !important;
+  }
+
+  #home-brands-inner h2,
+  #home-brands-inner h3 {
+    display: none !important;
+  }
+
+  #home-brands-inner {
+    padding: 24px 0 !important;
+    text-align: left !important;
+  }
+
+  /* Full width here, and on one line: there is room for it on a narrow
+     screen, and the stacked pair from the desktop rule is only there
+     because it has to fit in a 150px button beside the logos. */
+  #home-brands-inner a.mtw-brands-btn {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 0 16px !important;
+    padding: 10px 12px !important;
+    text-align: center !important;
+    white-space: normal !important;
+  }
+
+  #home-brands-inner a.mtw-brands-btn .mtw-brands-btn__w {
+    display: inline;
+  }
+
+  /* overflow: visible, not hidden. The desktop rule clips the strip to
+     its window; a grid that is clipped would cut the last row off. */
+  #home-brands-inner .mtw-marquee {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+    will-change: auto;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li {
+    float: none !important;
+    width: auto !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    background: transparent !important;
+    text-align: center;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li > div.details {
+    padding: 0 !important;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li div.name,
+  #home-brands-inner ul.mtw-marquee__track > li div.button-outer,
+  #home-brands-inner ul.mtw-marquee__track > li div.product-actions,
+  #home-brands-inner ul.mtw-marquee__track > li div.actions {
+    display: none !important;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li div.photo {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li img {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    margin: 0 auto;
+  }
+}
+
+/* Column count follows the rows it saves. Ten logos in two columns is
+   five rows, which left the block 948px tall on a 390px phone; three
+   columns makes it four rows with the logos still 112px wide, which is
+   enough for a wordmark. Below 360 the third column would drop under
+   100px and the marks started to lose their detail, so two holds. */
+@media (min-width: 360px) and (max-width: 991px) {
+  #home-brands-inner ul.mtw-marquee__track {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+
+@media (min-width: 768px) and (max-width: 991px) {
+  #home-brands-inner ul.mtw-marquee__track {
+    grid-template-columns: repeat(4, 1fr) !important;
   }
 }
