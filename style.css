@@ -994,3 +994,163 @@ body.public_index #footer {
 .mtw-cat-placeholder__t {
   font-size: 12px;
 }
+/* ------------------------------------------------------------------
+   1. One shared inset.
+
+   The theme breaks #home-brands out to the full viewport:
+
+     @media (min-width: 992px){
+       body.public_index #content #body #home-brands {
+         position: relative; width: 100vw; left: calc(-50vw + 50%);
+       }
+     }
+
+   So it measured 1920 while every sibling sat at 1705, and the brands
+   block was the one thing on the page not lined up with the content
+   padding. Reverting the full-bleed escape puts it back on the same
+   inset as the rest.
+
+   2. Homepage image slider capped at its natural size.
+
+   The single image in #homepage-image-slider-1 is 1170x365 natively but
+   was being stretched to 1705x532 at 1920 - a 46% upscale, which is why it
+   read as oversized and soft. Capped at 1170 and centred so it renders at
+   1:1 on anything wider than that.
+   ------------------------------------------------------------------ */
+
+@media (min-width: 992px) {
+  body.public_index #content #body #home-brands,
+  body.public_index #homepage-aboutus,
+  body.public_index #home-about {
+    position: static !important;
+    width: 100% !important;
+    left: auto !important;
+    max-width: 100% !important;
+  }
+
+  #home-brands-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  #homepage-image-slider-1 {
+    max-width: 1170px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  #homepage-image-slider-1 img {
+    max-width: 1170px !important;
+    height: auto !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    display: block !important;
+  }
+}
+/* ------------------------------------------------------------------
+   Brand marquee.
+
+   #home-brands-inner was a static grid: 136 brand logos at 382px each,
+   floated, filling a 987px tall block. It is now a single row of 150px
+   logos scrolling right to left, forever.
+
+   The row is built by duplicating the list once and animating the whole
+   strip by exactly the width of one copy, then wrapping back to zero.
+   Because both halves are identical the jump is invisible, so the loop
+   has no end stop and no visible seam.
+
+   Motion pauses on hover and is skipped entirely for anyone who has
+   asked for reduced motion, since an endless moving strip is the kind of
+   thing that needs to be stoppable.
+
+   The former "View All" button becomes the row heading: it sits above the
+   marquee, reads "Our Brands", still links to the full brand list, and
+   grows a little to the right on hover. The h2/h3 headings are hidden so
+   "Our Brands" is not said twice.
+   ------------------------------------------------------------------ */
+
+@media (min-width: 992px) {
+  #home-brands-inner h2,
+  #home-brands-inner h3 {
+    display: none !important;
+  }
+
+  /* The CMS emits the button last in the markup, so it renders below the
+     list. Column layout plus order puts it back on top where it belongs,
+     without moving anything in the template. */
+  #home-brands-inner {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  #home-brands-inner a.mtw-brands-btn {
+    order: -1 !important;
+    align-self: flex-start !important;
+    display: inline-block;
+    width: 150px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    margin-bottom: 20px;
+    transition: width 0.25s ease, background-color 0.25s ease;
+  }
+
+  #home-brands-inner a.mtw-brands-btn:hover,
+  #home-brands-inner a.mtw-brands-btn:focus-visible {
+    width: 190px;
+  }
+
+  #home-brands-inner .mtw-marquee {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  #home-brands-inner .mtw-marquee:hover ul.mtw-marquee__track {
+    animation-play-state: paused;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 24px;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+    width: max-content;
+    will-change: transform;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li {
+    flex: 0 0 150px !important;
+    float: none !important;
+    width: 150px !important;
+    margin: 0 !important;
+    text-align: center;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li > div.details {
+    padding: 0 !important;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li div.photo {
+    width: 100% !important;
+  }
+
+  #home-brands-inner ul.mtw-marquee__track > li img {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 991px) {
+  /* The static list is left alone on mobile, where a moving strip is
+     more nuisance than it is worth. */
+  #home-brands-inner a.mtw-brands-btn {
+    margin-bottom: 16px;
+  }
+}

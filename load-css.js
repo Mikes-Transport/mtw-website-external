@@ -342,16 +342,16 @@
     {
       selector: 'body.public_index .featured-products ul',
       responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
-                    1000: { items: 4, nav: true }, 1200: { items: 5, nav: true },
-                    1600: { items: 7, nav: true }, 1920: { items: 9, nav: true },
-                    2200: { items: 10, nav: true } }
+                    1000: { items: 5, nav: true }, 1200: { items: 6, nav: true },
+                    1600: { items: 8, nav: true }, 1920: { items: 9, nav: true },
+                    2200: { items: 11, nav: true } }
     },
     {
       selector: 'body.public_index #clearance-right ul',
       responsive: { 0: { items: 1, nav: true }, 600: { items: 2, nav: true },
-                    1000: { items: 4, nav: true }, 1200: { items: 5, nav: true },
-                    1600: { items: 7, nav: true }, 1920: { items: 9, nav: true },
-                    2200: { items: 10, nav: true } }
+                    1000: { items: 5, nav: true }, 1200: { items: 6, nav: true },
+                    1600: { items: 8, nav: true }, 1920: { items: 9, nav: true },
+                    2200: { items: 11, nav: true } }
     }
   ];
 
@@ -529,4 +529,164 @@
   } else {
     wait(0);
   }
+})();
+/* ------------------------------------------------------------------------
+   Brand marquee behaviour.
+
+   Turns the static brand list in #home-brands-inner into a strip that
+   scrolls right to left forever, and turns the old "View All" button into
+   an "Our Brands" heading above it.
+
+   The strip is built as its own element rather than by reusing the CMS
+   list, because that list cannot be used as-is:
+
+   - Only 10 of its 136 tiles are shown; the rest are display:none.
+     Cloning all 136 gave a strip whose clones were hidden too.
+   - The CMS layout manager keeps appending tiles after DOM ready, so any
+     cleanup done on the real list was undone a moment later.
+   - Flex gap applies between every adjacent pair of children, so the
+     hidden tiles left behind added gaps and made the run width wrong.
+
+   So the visible logos are copied into a fresh list, which is appended
+   twice to give two identical runs, and the CMS list is hidden. Nothing
+   the CMS does afterwards can disturb the track.
+
+   The loop: the strip is translated leftwards by exactly one run's width
+   and then snapped back to zero, landing on the start of the second
+   identical run. The repeat is invisible, so there is no end stop and no
+   seam.
+
+   Motion pauses on hover and is skipped for anyone who has asked for
+   reduced motion - an endless moving strip needs to be stoppable.
+   ------------------------------------------------------------------------ */
+
+(function brandsMarquee() {
+  'use strict';
+
+  var SPEED = 45;   /* px per second */
+  var LIST_MARK = 'data-mtw-source';
+  var TRACK_MARK = 'data-mtw-marquee';
+
+  function reduced() {
+    return !!(window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  /* Read the visible logos, then build our own two-run track from them. */
+  function build() {
+    var inner = document.querySelector('#home-brands-inner');
+    if (!inner) return null;
+
+    var btn = inner.querySelector('a.btn');
+    if (btn && !btn.classList.contains('mtw-brands-btn')) {
+      btn.classList.add('mtw-brands-btn');
+      btn.textContent = 'Our Brands';
+    }
+
+    var source = inner.querySelector('ul.tag-values');
+    if (!source) return null;
+
+    if (source.getAttribute(LIST_MARK) !== 'read') {
+      source.setAttribute(LIST_MARK, 'read');
+
+      var shown = [].filter.call(source.children, function (li) {
+        return window.getComputedStyle(li).display !== 'none';
+      });
+      if (!shown.length) return null;
+
+      var wrap = document.createElement('div');
+      wrap.className = 'mtw-marquee';
+
+      var track = document.createElement('ul');
+      track.className = 'mtw-marquee__track';
+      track.setAttribute(TRACK_MARK, 'built');
+
+      /* Two identical runs: originals, then clones. */
+      shown.forEach(function (li) { track.appendChild(li.cloneNode(true)); });
+      shown.forEach(function (li) {
+        var copy = li.cloneNode(true);
+        copy.classList.add('mtw-marquee__clone');
+        track.appendChild(copy);
+      });
+
+      wrap.appendChild(track);
+      source.parentNode.insertBefore(wrap, source);
+
+      /* The CMS list stays in the document for anything that looks it up,
+         but is no longer what is on screen. */
+      source.style.display = 'none';
+      inner.setAttribute('data-mtw-marquee-wrap', 'ready');
+    }
+
+    return { inner: inner, track: inner.querySelector('.mtw-marquee__track') };
+  }
+
+  /* Width of one run including gaps, measured between the first original
+     and the first clone rather than summed. */
+  function runWidth(track) {
+    var a = track.querySelector('li:not(.mtw-marquee__clone)');
+    var b = track.querySelector('li.mtw-marquee__clone');
+    if (!a || !b) return 0;
+    return Math.abs(b.getBoundingClientRect().left - a.getBoundingClientRect().left);
+  }
+
+  function start() {
+    var parts = build();
+    if (!parts || !parts.track) return;
+    var track = parts.track;
+
+    var half = runWidth(track);
+    if (!half) return;
+
+    if (reduced()) {
+      track.style.transform = 'translate3d(0, 0, 0)';
+      return;
+    }
+
+    var x = 0;
+    var last = null;
+
+    function frame(now) {
+      if (last === null) last = now;
+      var dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+
+      x -= SPEED * dt;
+      if (x <= -half) x += half;
+
+      track.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    var t = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(t);
+      t = setTimeout(function () { half = runWidth(track); }, 200);
+    });
+  }
+
+  /* Wait for the CMS layout manager to stop appending tiles, so all the
+     logos exist before the visible set is read. Two consecutive identical
+     counts means it has settled. */
+  function whenStable(tries, same) {
+    var el = document.querySelector('#home-brands-inner ul.tag-values');
+    if (!el) {
+      if (tries < 40) setTimeout(function () { whenStable(tries + 1, -1); }, 250);
+      return;
+    }
+    var n = el.children.length;
+    if (n === same) { start(); return; }
+    if (tries < 60) setTimeout(function () { whenStable(tries + 1, n); }, 300);
+  }
+
+  function ready() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { whenStable(0, -1); });
+    } else {
+      whenStable(0, -1);
+    }
+  }
+
+  ready();
 })();
