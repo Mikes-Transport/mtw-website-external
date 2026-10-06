@@ -81,7 +81,56 @@
 
     css: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/model-lookup.css',
 
-    /* The one CSV. Must be committed to the repo for raw.githack to serve it. */
+    /* --- where the CSV comes from ----------------------------------------
+
+       'firebase' - read a Firestore document, take the CSV link out of it, and
+       fetch that. The document holds only a URL, so the file itself can move
+       without touching this code and only the document has to be edited.
+
+       'url' - fetch csvUrl directly. Kept as a fallback: if the Firestore read
+       fails for any reason the widget should still find trailers rather than
+       show an error, and the committed CSV is always there.
+
+       The Firestore read tries two routes, in order:
+
+       1. window.db, if the page has initialised the SDK.
+       2. Firestore's REST API directly. No SDK and no page setup, so the
+          widget still works on a page that does not initialise Firebase.
+
+       Neither route needs an API key, as long as the Firestore security rules
+       allow public reads on that one document. Verified against
+       projects/mtw-lookup: csv-data/chassis_master_mte_export returns 200 with
+       the link, unauthenticated. If the rules ever change to require auth the
+       read fails and the widget falls back to csvUrl. */
+    csvSource: 'firebase',
+
+    firebase: {
+      project: 'mtw-lookup',
+      collection: 'csv-data',
+      document: 'chassis_master_mte_export',
+      field: 'link',
+      api: 'https://firestore.googleapis.com/v1/projects',
+      /* Loaded on demand, and only if window.db is there to use it. Must match
+         the version the page initialised the SDK with - a second copy would be
+         a separate module instance with its own app registry, and doc() from
+         one would not recognise a db from the other. ES modules are cached by
+         URL, so importing the same version the page used returns the same
+         instance. */
+      module: 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js',
+      /* The page's Firebase bootstrap is a module script, so it finishes
+         asynchronously. window.db may not exist yet when this widget boots, so
+         give it a moment before deciding it is never going to arrive. */
+      waitMs: 3000
+    },
+
+    /* PapaParse reads the CSV. It is the more careful parser of the two and
+       this file has quoted fields containing commas throughout, but the
+       built-in parser stays as a fallback so a blocked CDN cannot take the
+       widget down with it. If the page already loaded PapaParse, this is a
+       no-op. */
+    papaUrl: 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js',
+
+    /* Used when csvSource is 'url', and as the fallback if Firestore fails. */
     csvUrl: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/data/rego_search.csv',
 
     shopOrigin: 'https://www.mtw.co.nz',
@@ -89,6 +138,13 @@
     /* The shop's header cart, refreshed after every add so it stops showing a
        stale count. cartParts are the nodes inside it that hold the count and
        the total - those are what get swapped for the server's versions. */
+    /* Retries when a drawing fails to load. raw.githack is a third-party service in
+       front of GitHub and it drops connections intermittently - reported as
+       ERR_CONNECTION_RESET against raw.githubusercontent.com, which is where it
+       redirects to. One retry turns a permanently blank panel into a slightly
+       slower load. */
+    drawingRetries: 2,
+
     cartSelector: '.cart-outer',
     cartParts: ['.items', '.total'],
 
@@ -138,6 +194,15 @@
 
     /* CODE1..CODE250 */
     codePattern: /^CODE(\d+)$/i,
+
+    /* Words removed from what the visitor sees, and only that - the CSV is never
+       rewritten. These are supplier or brand names that appear inside free-text
+       spec fields ("050342 ALION 17.5\" AXLE 71\" TRACK"), which are data the
+       customer needs, so the word goes and the rest of the value stays.
+
+       This is display only. Anything read back from the CSV is untouched, and
+       the codes that drive the parts list are never passed through it. */
+    redactWords: ['Alion'],
 
     cacheHours: 12,
 
@@ -287,7 +352,140 @@
 
   /* --- csv -------------------------------------------------------------- */
 
-  /* RFC4180-ish. Needed rather than split(',') because trailer_type and the
+  /* PapaParse, loaded on demand rather than shipped.
+
+     It is only needed if the CSV is being read from Firestore, so there is no
+     point paying for it on a page that never looks up a trailer. Injected as a
+     plain script tag rather than bundled, because this file is loaded from a
+     CDN and bundling would mean rebuilding it on every change. */
+  var papaPromise = null;
+  function loadPapa() {
+    if (window.Papa && window.Papa.parse) return Promise.resolve(window.Papa);
+    if (papaPromise) return papaPromise;
+
+    papaPromise = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = cfg.papaUrl;
+      s.async = true;
+      s.onload = function () {
+        resolve(window.Papa || null);
+      };
+      /* Resolving with null rather than rejecting is deliberate. PapaParse is
+         an improvement, not a requirement - the built-in parser below handles
+         this file correctly, so a blocked CDN should degrade rather than fail. */
+      s.onerror = function () {
+        warn('PapaParse did not load, using the built-in CSV parser');
+        resolve(null);
+      };
+      document.head.appendChild(s);
+    });
+
+    return papaPromise;
+  }
+
+  /* The page's Firebase bootstrap is a module script, so window.db appears some
+     time after the widget starts. Polling for it rather than reading it once,
+     because reading it once would mean falling back to the committed CSV on
+     every page load and the Firestore link would never be used at all. */
+  function waitForDb(ms) {
+    return new Promise(function (resolve) {
+      if (window.db) { resolve(window.db); return; }
+      var waited = 0;
+      var iv = setInterval(function () {
+        waited += 100;
+        if (window.db) { clearInterval(iv); resolve(window.db); return; }
+        if (waited >= ms) { clearInterval(iv); resolve(null); }
+      }, 100);
+    });
+  }
+
+  /* Route 1: the SDK, against the page's own Firestore instance.
+
+     The SDK enforces the same even-length document id rule the REST API does,
+     so this fails fast and cleanly on a bad id rather than hanging. */
+  function linkViaSdk() {
+    var f = cfg.firebase;
+    return waitForDb(f.waitMs).then(function (db) {
+      if (!db) throw new Error('window.db never appeared');
+
+      return import(f.module).then(function (m) {
+        if (!m || !m.doc || !m.getDoc) throw new Error('Firestore module is missing doc/getDoc');
+        return m.getDoc(m.doc(db, f.collection, f.document));
+      }).then(function (snap) {
+        if (!snap || !snap.exists || !snap.exists()) {
+          throw new Error('no ' + f.collection + '/' + f.document);
+        }
+        var data = snap.data() || {};
+        var link = data[f.field];
+        if (!link) throw new Error('no "' + f.field + '" in that document');
+        return String(link);
+      });
+    });
+  }
+
+  /* Route 2: Firestore's REST API. Needs no SDK and no page setup. */
+  function linkViaRest() {
+    var f = cfg.firebase;
+    if (!f.project) return Promise.reject(new Error('firebase.project is not set'));
+
+    var url = f.api + '/' + f.project + '/databases/(default)/documents/' +
+              encodeURIComponent(f.collection) + '/' + encodeURIComponent(f.document);
+
+    return getJson(url).then(function (doc) {
+      var field = doc && doc.fields && doc.fields[f.field];
+      var link = field && (field.stringValue != null ? field.stringValue : field.value);
+      if (!link) throw new Error('no "' + f.field + '" in that document');
+      return String(link);
+    });
+  }
+
+  function firestoreCsvLink() {
+    return linkViaSdk()
+      .catch(function (e) { warn('Firestore SDK read failed:', e && e.message); return linkViaRest(); });
+  }
+
+  /* The text of the CSV, from wherever it turned out to live. */
+  function loadCsvText() {
+    if (cfg.csvSource !== 'firebase') return getText(cfg.csvUrl);
+
+    /* Resolve the link, then FETCH it. The Firestore document holds a URL, not
+       the data - returning the link from here and parsing that is the mistake
+       that made PapaParse parse a URL as a one-column CSV and report zero
+       rows. */
+    return firestoreCsvLink()
+      .then(function (link) { return getText(link); })
+      .catch(function (e) {
+        /* Falling back rather than showing an error. A committed copy exists at
+           csvUrl, so the worst case is a slightly stale dataset, which is a much
+           better outcome than "we can't find your trailer". */
+        warn('could not load the CSV from Firestore (' + (e && e.message) + '), falling back to csvUrl');
+        return getText(cfg.csvUrl);
+      });
+  }
+
+  /* PapaParse when it is there, the built-in parser otherwise. Both return the
+     same shape, so nothing downstream knows or cares which ran. */
+  function parseCsvAsync(text) {
+    return loadPapa().then(function (papa) {
+      if (!papa || !papa.parse) return parseCsv(text);
+
+      var res = papa.parse(String(text).replace(/^\uFEFF/, ''), {
+        header: false,
+        skipEmptyLines: 'greedy'
+      });
+
+      if (!res || !res.data || !res.data.length) return { header: [], rows: [] };
+
+      var header = (res.data.shift() || []).map(function (h) { return String(h).trim(); });
+      var rows = res.data.filter(function (r) {
+        return r.length > 1 || (r[0] || '').trim() !== '';
+      });
+      return { header: header, rows: rows };
+    });
+  }
+
+  /* RFC4180-ish, and the fallback for when PapaParse is unavailable. Needed
+     rather than split(',') because trailer_type and the
      spec columns hold quoted values containing commas, which would shift
      every column after them. */
   function parseCsv(text) {
@@ -794,6 +992,29 @@
     return p.join('');
   }
 
+  /* Watches the drawing for a dropped connection and retries it.
+
+     The <image> is left in the SVG rather than preloaded with new Image(),
+     because the SVG is built as a string and innerHTML cannot carry a
+     listener. SVGImageElement does fire `error` on a failed load, so it is
+     attached afterwards, by which point the element exists.
+
+     Retrying just rewrites href with a cache-buster - the failure was a reset
+     mid-transfer, so the request has to actually be made again rather than
+     served from whatever the browser decided to cache about the failure. */
+  function watchDrawing(art) {
+    var tries = 0;
+    art.addEventListener('error', function () {
+      if (tries++ >= cfg.drawingRetries) {
+        art.classList.add('is-missing');
+        warn('drawing failed to load after', tries, 'attempts');
+        return;
+      }
+      var href = art.getAttribute('href') || '';
+      art.setAttribute('href', href + (href.indexOf('?') > -1 ? '&' : '?') + 'r=' + Date.now());
+    });
+  }
+
   /* Where each dot sits comes from trailers.json, measured against that
      drawing's own bounding box - the drawings are not drawn to a common frame,
      so fixed canvas coordinates would miss on most of them. */
@@ -990,6 +1211,47 @@
     return { input: input };
   }
 
+  /* Scrubs a value on its way to the page. See cfg.redactWords.
+
+     Only ever called where a spec value is written out, which is the build
+     sheet, the summary tiles and the hotspot card. The CSV, and the stock
+     codes that drive the parts list, are untouched.
+
+     Removing a word from the middle of free text leaves tidying behind, so the
+     result is cleaned up: doubled spaces, a " / " that used to have a word on
+     one side of it, and separators stranded at either end. Interior separators
+     are kept, because "738020 - AL13AS-405mm Air Suspension" still reads
+     correctly with the dash in place. */
+  function display(value) {
+    var s = String(value == null ? '' : value);
+
+    cfg.redactWords.forEach(function (w) {
+      var safe = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      /* Boundary at the end only, never the start. Real values run the word
+         straight into a chassis number - "D22NB000NWN5LHDALION LINKWING
+         SPECIAL" - and requiring a boundary on both sides leaves that one
+         untouched. A trailing boundary still stops it eating the start of a
+         longer word such as "Alional". */
+      s = s.replace(new RegExp(safe + '\\b', 'gi'), ' ');
+    });
+
+    s = s.replace(/\s*\/\s*/g, '/')                  // "MTW/ AL13" -> "MTW/AL13"
+         .replace(/\s{2,}/g, ' ')
+         .trim();
+
+    /* Trimming separators off both ends tidies the gap a removed word leaves,
+       but a value that is only punctuation is itself the data - "-" in the
+       registration column, and similar in wheel_type_and_size and wip. So the
+       trim only applies when something survives it, otherwise the value is
+       left as it was minus the redacted word. */
+    var trimmed = s.replace(/^[\s,;:.\-\/]+/, '').replace(/[\s,;:.\-\/]+$/, '').trim();
+    if (trimmed) s = trimmed;
+
+    /* A value that was only the redacted word is now nothing. Leaving a blank
+       would read as missing data rather than removed data. */
+    return s || '—';
+  }
+
   function specList(rec, keys) {
     var dl = el('dl');
     var any = false;
@@ -1001,7 +1263,7 @@
       var label = '';
       state.fields.forEach(function (f) { if (f.key === k) label = f.label; });
       wrap.appendChild(el('dt', null, label || k));
-      wrap.appendChild(el('dd', null, v));
+      wrap.appendChild(el('dd', null, display(v)));
       dl.appendChild(wrap);
     });
     return any ? dl : null;
@@ -1028,6 +1290,11 @@
 
     rec2specsCache = rec.specs;
     viewer.innerHTML = buildSvg(rec);
+
+    /* Attached after the SVG is in the DOM, because innerHTML cannot carry a
+       listener across. */
+    var art = viewer.querySelector('.mtw-ml__drawing');
+    if (art) watchDrawing(art);
 
     /* The component card floats over the drawing. Selecting a part then
        explains itself in place instead of shoving the page around.
@@ -1149,7 +1416,7 @@
       if (!v) return;
       var box = el('div', 'mtw-ml__fact');
       box.appendChild(el('dt', null, f.label));
-      box.appendChild(el('dd', null, v));
+      box.appendChild(el('dd', null, display(v)));
       wrap.appendChild(box);
       shown++;
     });
@@ -1679,9 +1946,12 @@
 
     /* The CSV and the drawing map load together. Neither is needed for a trailer
        to be found, so a failure in the map must not take the whole widget down
-       with it - the build sheet is still worth showing without a drawing. */
+       with it - the build sheet is still worth showing without a drawing.
+
+       The CSV goes through loadCsvText, which is what resolves where it lives:
+       from Firestore by default, or straight from csvUrl. */
     var boot = [
-      getText(cfg.csvUrl),
+      loadCsvText().then(parseCsvAsync),
       getJson(cfg.trailerMapUrl).catch(function (e) {
         warn('no trailer drawings:', e && e.message);
         return null;
@@ -1690,7 +1960,7 @@
     if (!cfg.lookupOnDemand && cfg.lookupIndexUrl) boot.push(getJson(cfg.lookupIndexUrl));
 
     Promise.all(boot).then(function (both) {
-      var parsed = parseCsv(both[0]);
+      var parsed = both[0];
       if (!parsed.rows.length) throw new Error('CSV had no data rows');
 
       var shaped = shape(parsed);

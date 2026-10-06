@@ -189,6 +189,12 @@
    from trailers.json need no scaling. */
 .mtw-ml__drawing { pointer-events: none; }
 
+/* A drawing that failed every retry. Hidden rather than left broken - some
+   browsers draw a torn-image placeholder, which reads as part of the trailer.
+   The build sheet beside it is unaffected, so the panel still says something
+   useful. */
+.mtw-ml__drawing.is-missing { display: none; }
+
 /* A small card tucked into the corner of the drawing, not a panel across
    the bottom of it. Bounded on both axes and scrollable, so a component with
    eight spec rows cannot swallow the trailer it is describing. */
