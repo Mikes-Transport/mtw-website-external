@@ -14,7 +14,23 @@
    x 333 columns and arrives at 258 KB gzipped, so it is cached in
    localStorage after the first load and never re-fetched.
 
-   Two things come out of it, and they are deliberately kept apart:
+   WHERE THE CSV COMES FROM
+   ------------------------
+   The widget now initialises Firebase itself, in this order:
+
+     1. initializeApp() with cfg.firebase.config (a named app, so it can never
+        clash with a Firebase app the host page has set up).
+     2. Read csv-data/chassis_master_mte_export from Firestore and take the
+        `link` field out of it.
+     3. Fetch that link and check it really is the CSV before it is cached or
+        parsed.
+     4. Parse it. Same data, same shape, nothing downstream changes.
+
+   If any step fails - bad config, rules, CORS on the link, an HTML error page
+   where the CSV should be - the widget logs why and falls back to csvUrl, so a
+   visitor still finds their trailer.
+
+   Two things come out of the CSV, and they are deliberately kept apart:
 
      parts     CODE1..CODE250 for the searched row -> the parts cards.
                This is the ONLY source of product information. Nothing in the
@@ -83,44 +99,46 @@
 
     /* --- where the CSV comes from ----------------------------------------
 
-       'firebase' - read a Firestore document, take the CSV link out of it, and
-       fetch that. The document holds only a URL, so the file itself can move
-       without touching this code and only the document has to be edited.
+       'firebase' - initialise Firebase, read a Firestore document, take the CSV
+       link out of it, and fetch that. The document holds only a URL, so the
+       file itself can move without touching this code and only the document
+       has to be edited.
 
-       'url' - fetch csvUrl directly. Kept as a fallback: if the Firestore read
-       fails for any reason the widget should still find trailers rather than
-       show an error, and the committed CSV is always there.
+       'url' - fetch csvUrl directly.
 
-       The Firestore read tries two routes, in order:
-
-       1. window.db, if the page has initialised the SDK.
-       2. Firestore's REST API directly. No SDK and no page setup, so the
-          widget still works on a page that does not initialise Firebase.
-
-       Neither route needs an API key, as long as the Firestore security rules
-       allow public reads on that one document. Verified against
-       projects/mtw-lookup: csv-data/chassis_master_mte_export returns 200 with
-       the link, unauthenticated. If the rules ever change to require auth the
-       read fails and the widget falls back to csvUrl. */
+       csvUrl is also the fallback if anything on the Firebase route fails, so
+       the widget still finds trailers rather than showing an error. */
     csvSource: 'firebase',
 
     firebase: {
-      project: 'mtw-lookup',
+      /* From Firebase console > Project settings > Your apps > Web app.
+         These identify the project; they are not secrets. Access is
+         controlled by the Firestore security rules, which must allow a public
+         read of the one document below.
+
+         FILL IN apiKey AND appId. While either is still a placeholder the SDK
+         route is skipped and the REST route (which needs neither) is used. */
+      config: {
+        apiKey: 'AIzaSyA6i9ZVdE1xmSzjebcx1zUJpA-Zuy_DgSs',
+        authDomain: 'mtw-lookup.firebaseapp.com',
+        projectId: 'mtw-lookup',
+        appId: '1:365628896617:web:f3d718fad93b14501679f8'
+      },
+
+      /* A named app, so this widget's Firebase instance is separate from any
+         the host page initialises and neither can clobber the other. */
+      appName: 'mtw-model-lookup',
       collection: 'csv-data',
       document: 'chassis_master_mte_export',
       field: 'link',
+      /* REST route, used when the SDK route fails. Needs no SDK and no key. */
       api: 'https://firestore.googleapis.com/v1/projects',
-      /* Loaded on demand, and only if window.db is there to use it. Must match
-         the version the page initialised the SDK with - a second copy would be
-         a separate module instance with its own app registry, and doc() from
-         one would not recognise a db from the other. ES modules are cached by
-         URL, so importing the same version the page used returns the same
-         instance. */
+      /* Loaded on demand. Both must be the same version. */
+      appModule: 'https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js',
       module: 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js',
-      /* The page's Firebase bootstrap is a module script, so it finishes
-         asynchronously. window.db may not exist yet when this widget boots, so
-         give it a moment before deciding it is never going to arrive. */
-      waitMs: 3000
+      /* Upper bound on the SDK route, so a blocked CDN or an unreachable
+         Firestore cannot hold the widget on "Loading" indefinitely. */
+      timeoutMs: 8000
     },
 
     /* PapaParse reads the CSV. It is the more careful parser of the two and
@@ -130,14 +148,11 @@
        no-op. */
     papaUrl: 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js',
 
-    /* Used when csvSource is 'url', and as the fallback if Firestore fails. */
+    /* Used when csvSource is 'url', and as the fallback if the Firebase route fails. */
     csvUrl: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/data/rego_search.csv',
 
     shopOrigin: 'https://www.mtw.co.nz',
 
-    /* The shop's header cart, refreshed after every add so it stops showing a
-       stale count. cartParts are the nodes inside it that hold the count and
-       the total - those are what get swapped for the server's versions. */
     /* Retries when a drawing fails to load. raw.githack is a third-party service in
        front of GitHub and it drops connections intermittently - reported as
        ERR_CONNECTION_RESET against raw.githubusercontent.com, which is where it
@@ -145,6 +160,23 @@
        slower load. */
     drawingRetries: 2,
 
+    /* Hosts tried in turn for each drawing, first one first. imgBase is always
+       tried first; these are the backups. All three serve the same files from
+       the same GitHub repo, so one being down or resetting connections does not
+       leave the panel blank. jsDelivr is a production CDN; raw.githack is a
+       dev proxy and is the weakest link here. */
+    imgMirrors: [
+      'https://cdn.jsdelivr.net/gh/Mikes-Transport/mtw-website-external@main/model-lookup/img/',
+      'https://raw.githubusercontent.com/Mikes-Transport/mtw-website-external/main/model-lookup/img/'
+    ],
+
+    /* Per-attempt cap, so a hung connection counts as a failure and the next
+       host is tried instead of waiting on the browser's own (very long) timeout. */
+    imageTimeoutMs: 8000,
+
+    /* The shop's header cart, refreshed after every add so it stops showing a
+       stale count. cartParts are the nodes inside it that hold the count and
+       the total - those are what get swapped for the server's versions. */
     cartSelector: '.cart-outer',
     cartParts: ['.items', '.total'],
 
@@ -154,6 +186,14 @@
        directory. */
     trailerMapUrl: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/img/trailers.json',
     imgBase: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/img/',
+
+    /* Backups for trailers.json itself. This file decides WHICH drawing a trailer
+       gets, so if it fails to load there are no drawings at all for the visit,
+       regardless of how reliable the PNG hosts are. */
+    trailerMapMirrors: [
+      'https://cdn.jsdelivr.net/gh/Mikes-Transport/mtw-website-external@main/model-lookup/img/trailers.json',
+      'https://raw.githubusercontent.com/Mikes-Transport/mtw-website-external/main/model-lookup/img/trailers.json'
+    ],
 
     /* Clickable component dots on the drawing, and the card that opens over it.
        Off for now. The points in img/trailers.json are geometric estimates
@@ -180,13 +220,13 @@
        where the same-origin search will not be available. */
     lookupIndexUrl: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/data/products.json',
 
-    /* Resolved products are cached in localStorage per code, so a second
-       visitor on the same trailer pays nothing. */
     /* How many stock codes go out in one search request. The endpoint matches
        every term in the query, so this is a straight request-count divisor.
        20 keeps a 165-code trailer at nine requests. */
     lookupBatch: 20,
 
+    /* Resolved products are cached in localStorage per code, so a second
+       visitor on the same trailer pays nothing. */
     lookupCacheDays: 7,
 
     /* Columns. regoField is the one the customer types into. */
@@ -210,7 +250,7 @@
        selection on the way back. 'new' is a plain target="_blank". */
     cardTarget: 'blank',
 
-    /* The four specs shown as cards above the build sheet. Short labels from
+    /* The specs shown as cards above the build sheet. Short labels from
        the CSV columns they read. Order is the display order. */
     factFields: [
       { label: 'Axles', key: 'axle' },
@@ -306,6 +346,10 @@
 
   /* --- helpers ---------------------------------------------------------- */
 
+  /* Shallow merge, with one level of depth for the nested config objects that
+     a page is likely to override piecemeal. Without the depth, setting
+     firebase: { project: 'x' } on the page would silently delete the
+     collection, document and field defaults. */
   function merge(base, over) {
     var out = {}, k;
     for (k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = base[k];
@@ -313,6 +357,12 @@
       for (k in over) if (Object.prototype.hasOwnProperty.call(over, k)) out[k] = over[k];
       if (over.columns) out.columns = merge(base.columns, over.columns);
       if (over.specFields) out.specFields = over.specFields;
+      if (over.firebase && base.firebase) {
+        out.firebase = merge(base.firebase, over.firebase);
+        if (over.firebase.config && base.firebase.config) {
+          out.firebase.config = merge(base.firebase.config, over.firebase.config);
+        }
+      }
     }
     return out;
   }
@@ -383,83 +433,134 @@
     return papaPromise;
   }
 
-  /* The page's Firebase bootstrap is a module script, so window.db appears some
-     time after the widget starts. Polling for it rather than reading it once,
-     because reading it once would mean falling back to the committed CSV on
-     every page load and the Firestore link would never be used at all. */
-  function waitForDb(ms) {
-    return new Promise(function (resolve) {
-      if (window.db) { resolve(window.db); return; }
-      var waited = 0;
-      var iv = setInterval(function () {
-        waited += 100;
-        if (window.db) { clearInterval(iv); resolve(window.db); return; }
-        if (waited >= ms) { clearInterval(iv); resolve(null); }
-      }, 100);
+  /* Rejects if the promise has not settled inside ms. Used so a blocked CDN or
+     an unreachable Firestore falls through to the next route instead of
+     leaving the widget on "Loading the parts database..." forever. */
+  function withTimeout(promise, ms, label) {
+    return new Promise(function (resolve, reject) {
+      var t = setTimeout(function () { reject(new Error(label + ' timed out')); }, ms);
+      promise.then(
+        function (v) { clearTimeout(t); resolve(v); },
+        function (e) { clearTimeout(t); reject(e); }
+      );
     });
   }
 
-  /* Route 1: the SDK, against the page's own Firestore instance.
+  /* True while the config still holds the placeholder values from the
+     template. Initialising Firebase with those would only produce a confusing
+     error later, so the SDK route is skipped with a clear message instead. */
+  function firebaseConfigIsPlaceholder(config) {
+    if (!config) return true;
+    return ['apiKey', 'appId'].some(function (k) {
+      return !config[k] || /^YOUR_/i.test(String(config[k]));
+    });
+  }
 
-     The SDK enforces the same even-length document id rule the REST API does,
-     so this fails fast and cleanly on a bad id rather than hanging. */
+  /* Route 1: initialise Firebase ourselves, then read the document.
+
+     The widget owns its Firebase app. It does not wait for the page to create
+     window.db and does not depend on the page having set anything up. The app
+     is named, so it cannot collide with one the host page initialised, and it
+     is reused if the widget happens to mount twice.
+
+     Both modules are imported by URL at the same version. ES modules are
+     cached by URL, so firebase-firestore.js resolves its own firebase-app
+     dependency to the same instance imported here. */
   function linkViaSdk() {
     var f = cfg.firebase;
-    return waitForDb(f.waitMs).then(function (db) {
-      if (!db) throw new Error('window.db never appeared');
 
-      return import(f.module).then(function (m) {
-        if (!m || !m.doc || !m.getDoc) throw new Error('Firestore module is missing doc/getDoc');
-        return m.getDoc(m.doc(db, f.collection, f.document));
-      }).then(function (snap) {
-        if (!snap || !snap.exists || !snap.exists()) {
-          throw new Error('no ' + f.collection + '/' + f.document);
-        }
-        var data = snap.data() || {};
-        var link = data[f.field];
-        if (!link) throw new Error('no "' + f.field + '" in that document');
-        return String(link);
-      });
+    if (firebaseConfigIsPlaceholder(f.config)) {
+      return Promise.reject(new Error('firebase.config still has placeholder apiKey/appId'));
+    }
+
+    var run = Promise.all([import(f.appModule), import(f.module)]).then(function (mods) {
+      var appMod = mods[0];
+      var fs = mods[1];
+
+      if (!appMod.initializeApp || !appMod.getApps || !fs.getFirestore || !fs.doc || !fs.getDoc) {
+        throw new Error('Firebase modules are missing expected exports');
+      }
+
+      var app = appMod.getApps().filter(function (a) { return a.name === f.appName; })[0] ||
+                appMod.initializeApp(f.config, f.appName);
+
+      var db = fs.getFirestore(app);
+      return fs.getDoc(fs.doc(db, f.collection, f.document));
+    }).then(function (snap) {
+      if (!snap || !snap.exists || !snap.exists()) {
+        throw new Error('no ' + f.collection + '/' + f.document);
+      }
+      var link = (snap.data() || {})[f.field];
+      if (!link) throw new Error('no "' + f.field + '" in that document');
+      return String(link);
     });
+
+    return withTimeout(run, f.timeoutMs, 'Firebase SDK read');
   }
 
-  /* Route 2: Firestore's REST API. Needs no SDK and no page setup. */
+  /* Route 2: Firestore's REST API. Needs no SDK and no API key, so it still
+     works when the config above has not been filled in. Same document, same
+     field. */
   function linkViaRest() {
     var f = cfg.firebase;
-    if (!f.project) return Promise.reject(new Error('firebase.project is not set'));
+    var projectId = f.config && f.config.projectId;
+    if (!projectId) return Promise.reject(new Error('firebase.config.projectId is not set'));
 
-    var url = f.api + '/' + f.project + '/databases/(default)/documents/' +
+    var url = f.api + '/' + projectId + '/databases/(default)/documents/' +
               encodeURIComponent(f.collection) + '/' + encodeURIComponent(f.document);
 
-    return getJson(url).then(function (doc) {
+    /* Not cached. This response is a pointer, and a stale pointer is exactly
+       what would keep visitors on an old file after the link is changed. */
+    return withTimeout(
+      fetch(url, { credentials: 'omit' }).then(function (r) {
+        if (!r.ok) throw new Error(url + ' -> HTTP ' + r.status);
+        return r.json();
+      }),
+      cfg.firebase.timeoutMs, 'Firestore REST read'
+    ).then(function (doc) {
       var field = doc && doc.fields && doc.fields[f.field];
-      var link = field && (field.stringValue != null ? field.stringValue : field.value);
+      var link = field && field.stringValue;
       if (!link) throw new Error('no "' + f.field + '" in that document');
       return String(link);
     });
   }
 
+  /* SDK first, REST if that fails for any reason. */
   function firestoreCsvLink() {
-    return linkViaSdk()
-      .catch(function (e) { warn('Firestore SDK read failed:', e && e.message); return linkViaRest(); });
+    return linkViaSdk().catch(function (e) {
+      warn('Firebase SDK route failed (' + (e && e.message) + '), trying REST');
+      return linkViaRest();
+    });
   }
 
-  /* The text of the CSV, from wherever it turned out to live. */
+  /* The header row must contain the rego column. This is what separates the
+     real CSV from the things a bad link tends to return - an HTML error page,
+     a login redirect, an empty file - all of which come back as HTTP 200 and
+     would otherwise be cached for hours and parsed into nothing. */
+  function looksLikeCsv(text) {
+    return typeof text === 'string' &&
+      text.slice(0, 20000).indexOf(cfg.columns.rego) > -1;
+  }
+
+  /* The text of the CSV, from wherever it turned out to live.
+
+     Order: Firebase (init -> read link -> fetch link), then csvUrl. Every
+     fetch is validated, so a link that returns the wrong thing counts as a
+     failure and triggers the fallback rather than poisoning the cache. */
   function loadCsvText() {
-    if (cfg.csvSource !== 'firebase') return getText(cfg.csvUrl);
+    if (cfg.csvSource !== 'firebase') return getText(cfg.csvUrl, looksLikeCsv);
 
     /* Resolve the link, then FETCH it. The Firestore document holds a URL, not
-       the data - returning the link from here and parsing that is the mistake
-       that made PapaParse parse a URL as a one-column CSV and report zero
-       rows. */
+       the data - parsing the link itself is what once produced a one-column
+       CSV and a report of zero rows. */
     return firestoreCsvLink()
-      .then(function (link) { return getText(link); })
+      .then(function (link) { return getText(link, looksLikeCsv); })
       .catch(function (e) {
         /* Falling back rather than showing an error. A committed copy exists at
            csvUrl, so the worst case is a slightly stale dataset, which is a much
            better outcome than "we can't find your trailer". */
-        warn('could not load the CSV from Firestore (' + (e && e.message) + '), falling back to csvUrl');
-        return getText(cfg.csvUrl);
+        warn('could not load the CSV via Firebase (' + (e && e.message) + '), falling back to csvUrl');
+        return getText(cfg.csvUrl, looksLikeCsv);
       });
   }
 
@@ -881,15 +982,27 @@
     } catch (e) { /* cache is an optimisation, never a requirement */ }
   }
 
-  function getText(url) {
+  /* validate is optional. When given, it is applied to cached text AND to a
+     fresh response, and a body that fails it is neither returned nor cached.
+     That matters because a bad link usually still answers HTTP 200 - an HTML
+     error page, a login screen - so checking r.ok alone would cache it for
+     cfg.cacheHours and the fallback would never get a chance to run. */
+  function getText(url, validate) {
     var hit = cacheGet('mtw-ml:' + url);
-    if (hit != null) return Promise.resolve(hit);
+    if (hit != null && (!validate || validate(hit))) return Promise.resolve(hit);
+
     return fetch(url, { credentials: 'omit' })
       .then(function (r) {
         if (!r.ok) throw new Error(url + ' -> HTTP ' + r.status);
         return r.text();
       })
-      .then(function (body) { cacheSet('mtw-ml:' + url, body); return body; });
+      .then(function (body) {
+        if (validate && !validate(body)) {
+          throw new Error(url + ' did not look like the CSV');
+        }
+        cacheSet('mtw-ml:' + url, body);
+        return body;
+      });
   }
 
   function getJson(url) {
@@ -912,6 +1025,66 @@
     link.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap';
     link.setAttribute('data-mtw-ml-fonts', '');
     document.head.appendChild(link);
+  }
+
+  /* --- trailer map loader ------------------------------------------------ */
+
+  /* trailers.json, loaded with retries and backup hosts.
+
+     Validated before it is trusted or cached: it must parse and carry the
+     `match` and `images` the lookup needs. A CDN error page or a half-written
+     file would otherwise be cached for cfg.cacheHours and leave every trailer
+     without a drawing until it expired.
+
+     Cached under the primary URL's key, so a warm visit costs nothing. */
+  function validTrailerMap(m) {
+    return !!(m && Array.isArray(m.match) && m.images && typeof m.images === 'object');
+  }
+
+  function loadTrailerMap() {
+    var cacheKey = 'mtw-ml:' + cfg.trailerMapUrl;
+    var hit = cacheGet(cacheKey);
+    if (hit != null) {
+      try {
+        var cached = JSON.parse(hit);
+        if (validTrailerMap(cached)) return Promise.resolve(cached);
+      } catch (e) { /* fall through to the network */ }
+    }
+
+    var urls = [cfg.trailerMapUrl].concat(cfg.trailerMapMirrors || []).filter(function (u, i, a) {
+      return u && a.indexOf(u) === i;
+    });
+
+    function once(url, bust) {
+      var full = url + (bust ? (url.indexOf('?') > -1 ? '&' : '?') + 'r=' + Date.now() : '');
+      return withTimeout(
+        fetch(full, { credentials: 'omit' }).then(function (r) {
+          if (!r.ok) throw new Error(url + ' -> HTTP ' + r.status);
+          return r.json();
+        }),
+        cfg.imageTimeoutMs, 'trailers.json'
+      ).then(function (m) {
+        if (!validTrailerMap(m)) throw new Error(url + ' is not a valid trailer map');
+        return m;
+      });
+    }
+
+    function round(n) {
+      var chain = Promise.reject(new Error('start'));
+      urls.forEach(function (u) {
+        chain = chain.catch(function () { return once(u, n > 0); });
+      });
+      return chain.catch(function (e) {
+        if (n >= cfg.drawingRetries) throw e;
+        return new Promise(function (r) { setTimeout(r, 400 * (n + 1)); })
+          .then(function () { return round(n + 1); });
+      });
+    }
+
+    return round(0).then(function (m) {
+      cacheSet(cacheKey, JSON.stringify(m));
+      return m;
+    });
   }
 
   /* --- drawings ---------------------------------------------------------- */
@@ -972,9 +1145,10 @@
       (rec.type || 'Trailer') + ' side view">');
 
     if (d) {
+      /* No href here. watchDrawing() preloads the file, retries and falls back
+         across hosts, and only then points this element at a URL it knows works. */
       p.push('<image class="mtw-ml__drawing" x="0" y="0" width="1800" height="600"' +
-        ' preserveAspectRatio="xMidYMid meet"' +
-        ' href="' + cfg.imgBase + d.slug + '.png"/>');
+        ' preserveAspectRatio="xMidYMid meet" data-slug="' + d.slug + '"/>');
     }
 
     /* Dots are skipped when there is no drawing to point at, and entirely while
@@ -992,26 +1166,91 @@
     return p.join('');
   }
 
-  /* Watches the drawing for a dropped connection and retries it.
+  /* Drawings that have already loaded this session, slug -> working URL, so a
+     second search for the same trailer type paints instantly. */
+  var drawingOk = {};
 
-     The <image> is left in the SVG rather than preloaded with new Image(),
-     because the SVG is built as a string and innerHTML cannot carry a
-     listener. SVGImageElement does fire `error` on a failed load, so it is
-     attached afterwards, by which point the element exists.
+  /* Preloads one URL with a plain Image. new Image() fires onload/onerror
+     reliably in every browser, unlike an SVG <image>, and it needs no CORS
+     because nothing is read back - the file just has to decode. A timeout
+     turns a hung connection into a failure instead of an indefinite wait. */
+  function tryImage(url) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var done = false;
+      var t = setTimeout(function () {
+        if (done) return;
+        done = true;
+        img.onload = img.onerror = null;
+        reject(new Error('timed out'));
+      }, cfg.imageTimeoutMs);
 
-     Retrying just rewrites href with a cache-buster - the failure was a reset
-     mid-transfer, so the request has to actually be made again rather than
-     served from whatever the browser decided to cache about the failure. */
+      img.onload = function () {
+        if (done) return;
+        done = true; clearTimeout(t);
+        resolve(url);
+      };
+      img.onerror = function () {
+        if (done) return;
+        done = true; clearTimeout(t);
+        reject(new Error('failed'));
+      };
+      img.src = url;
+    });
+  }
+
+  /* Tries every host in order, then goes round again after a short backoff, up
+     to cfg.drawingRetries extra rounds. Resolves with the first URL that
+     actually loaded; rejects only when every host has failed every round.
+
+     Rounds after the first add a cache-buster. A reset mid-transfer can leave a
+     bad entry behind, and without the buster the retry may just be served that. */
+  function loadDrawing(slug) {
+    if (drawingOk[slug]) return Promise.resolve(drawingOk[slug]);
+
+    var bases = [cfg.imgBase].concat(cfg.imgMirrors || []).filter(function (b, i, a) {
+      return b && a.indexOf(b) === i;
+    });
+    if (!bases.length) bases = [''];
+
+    function round(n) {
+      var chain = Promise.reject(new Error('start'));
+      bases.forEach(function (base) {
+        chain = chain.catch(function () {
+          var url = base + slug + '.png' + (n ? '?r=' + Date.now() : '');
+          return tryImage(url);
+        });
+      });
+      return chain.catch(function (e) {
+        if (n >= cfg.drawingRetries) throw e;
+        return new Promise(function (r) { setTimeout(r, 400 * (n + 1)); })
+          .then(function () { return round(n + 1); });
+      });
+    }
+
+    return round(0).then(function (url) {
+      drawingOk[slug] = url;
+      return url;
+    });
+  }
+
+  /* Fills the <image> in the SVG. Called after innerHTML, since the SVG is a
+     string and cannot carry the loader with it. */
   function watchDrawing(art) {
-    var tries = 0;
-    art.addEventListener('error', function () {
-      if (tries++ >= cfg.drawingRetries) {
-        art.classList.add('is-missing');
-        warn('drawing failed to load after', tries, 'attempts');
-        return;
-      }
-      var href = art.getAttribute('href') || '';
-      art.setAttribute('href', href + (href.indexOf('?') > -1 ? '&' : '?') + 'r=' + Date.now());
+    var slug = art.getAttribute('data-slug');
+    if (!slug) return;
+
+    art.classList.add('is-loading');
+
+    loadDrawing(slug).then(function (url) {
+      /* The panel may have been replaced by a newer search while this was
+         loading; setting an href on a detached node is harmless. */
+      art.setAttribute('href', url);
+      art.classList.remove('is-loading');
+    }, function () {
+      art.classList.remove('is-loading');
+      art.classList.add('is-missing');
+      warn('drawing failed on every host:', slug);
     });
   }
 
@@ -1405,7 +1644,7 @@
     float.appendChild(list);
   }
 
-  /* The four-up spec cards above the full build sheet. Only fields with a value
+  /* The spec cards above the full build sheet. Only fields with a value
      are shown, so an empty one does not sit there reading "undefined". */
   function renderFacts(rec) {
     var wrap = el('div', 'mtw-ml__facts');
@@ -1537,9 +1776,23 @@
       var media = el('div', 'mtw-ml__card-media');
       if (p.image) {
         var img = el('img');
-        img.src = p.image;
         img.alt = '';
         img.loading = 'lazy';
+        /* One retry with a cache-buster, then the placeholder, so a dropped
+           connection never leaves a broken-image icon on a card. */
+        var imgTried = false;
+        img.onerror = function () {
+          if (!imgTried) {
+            imgTried = true;
+            img.src = p.image + (p.image.indexOf('?') > -1 ? '&' : '?') + 'r=' + Date.now();
+            return;
+          }
+          img.onerror = null;
+          if (img.parentNode) img.parentNode.removeChild(img);
+          media.className += ' mtw-ml__card-media--none';
+          media.innerHTML = PLACEHOLDER_SVG;
+        };
+        img.src = p.image;
         media.appendChild(img);
       } else {
         media.className += ' mtw-ml__card-media--none';
@@ -1862,7 +2115,25 @@
        the wrong trailer on top of the right one. */
     var generation = 0;
 
+    /* If trailers.json failed at boot, try again now rather than showing
+       drawing-less trailers for the rest of the visit. Only waits when the map
+       is actually missing, and only once per search. */
+    var searchToken = 0;
     function runLookup(rec, input) {
+      if (rec && !state.trailers) {
+        var token = ++searchToken;
+        loadTrailerMap().then(function (m) { state.trailers = m; }, function () {})
+          .then(function () {
+            if (token !== searchToken) return;   // a newer search took over
+            runLookupNow(rec, input);
+          });
+        return;
+      }
+      searchToken++;
+      runLookupNow(rec, input);
+    }
+
+    function runLookupNow(rec, input) {
       var mine = ++generation;
 
       if (!rec) {
@@ -1949,11 +2220,14 @@
        with it - the build sheet is still worth showing without a drawing.
 
        The CSV goes through loadCsvText, which is what resolves where it lives:
-       from Firestore by default, or straight from csvUrl. */
+       Firebase (init -> Firestore link -> fetch) by default, with csvUrl as the
+       backup. */
     var boot = [
       loadCsvText().then(parseCsvAsync),
-      getJson(cfg.trailerMapUrl).catch(function (e) {
-        warn('no trailer drawings:', e && e.message);
+      loadTrailerMap().catch(function (e) {
+        /* Not fatal - the build sheet still works - but runLookup will try
+           again on the first search rather than going without for the visit. */
+        warn('no trailer drawings (will retry on search):', e && e.message);
         return null;
       })
     ];
