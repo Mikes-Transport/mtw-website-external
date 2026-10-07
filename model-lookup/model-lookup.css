@@ -20,7 +20,13 @@
    buttons or Bootstrap 3 classes.
    ------------------------------------------------------------------------ */
 
-.mtw-ml {
+/* The tokens live on a shared selector rather than on .mtw-ml alone, because
+   the access gate renders BEFORE .mtw-ml exists - it is the thing that decides
+   whether .mtw-ml gets built at all. With the tokens only on .mtw-ml, every
+   var() in the gate resolved to nothing and the field came out transparent
+   with no border. */
+.mtw-ml,
+.mtw-ml-gate {
   --ml-ink: #12171f;
   --ml-muted: #5b6678;
   --ml-accent: #5ab0ff;
@@ -29,6 +35,9 @@
   --ml-sunken: #f1f4f8;
   --ml-field: #f7f9fb;
   --ml-mono: #3d5a80;
+}
+
+.mtw-ml {
 
   margin: 0;
   color: var(--ml-ink);
@@ -188,6 +197,138 @@
    background, and the viewBox matches that exactly, so hotspot coordinates
    from trailers.json need no scaling. */
 .mtw-ml__drawing { pointer-events: none; }
+
+/* --- access gate -------------------------------------------------------- */
+
+/* --- access gate -------------------------------------------------------- */
+
+/* A form, not a product. Everything is centred so the only thing on screen is
+   a heading, one field and one way in. */
+
+/* The gate is not inside .mtw-ml, so it does not inherit that reset. Without
+   this it computes box-sizing: content-box from the theme, padding lands
+   outside max-width, and every child measures ~29px off centre. */
+.mtw-ml-gate,
+.mtw-ml-gate *,
+.mtw-ml-gate *::before,
+.mtw-ml-gate *::after {
+  box-sizing: border-box !important;
+}
+
+/* !important throughout, and not optional: the theme styles inputs and
+   buttons with its own !important rules, so without these the field came out
+   20px tall and transparent on the real site while looking perfect in a
+   plain test page. */
+.mtw-ml-gate {
+  background: #fff !important;
+  border: 1px solid var(--ml-line) !important;
+  border-radius: 16px !important;
+  padding: 32px 28px 28px !important;
+  max-width: 380px !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+}
+
+.mtw-ml-gate__title {
+  margin: 0 0 6px !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  text-align: center !important;
+}
+
+/* Field and button stack rather than sit side by side, so the button is a
+   target in its own right instead of something to notice. */
+
+/* Column, so the button gets its own full-width row under the field rather
+   than sitting beside it. Plenty of people type a code and wait for something
+   to happen, so the way in has to be visible. */
+.mtw-ml-gate__form {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  margin-top: 20px !important;
+}
+
+.mtw-ml-gate__input {
+  display: block !important;
+  width: 100% !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  line-height: normal !important;
+  padding: 0 14px !important;
+  font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  /* Wide tracking on a short code makes the four digits read as four separate
+     characters, which is the whole point of the field. */
+  letter-spacing: 0.42em;
+  /* Tracking pushes the last glyph right, so the text is nudged back to sit
+     optically centred rather than mathematically. */
+  text-indent: 0.42em;
+  text-align: center;
+  background: var(--ml-field) !important;
+  color: var(--ml-ink) !important;
+  border: 1px solid var(--ml-line-2) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.mtw-ml-gate__input::placeholder {
+  letter-spacing: normal;
+  text-indent: 0;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 1;
+  color: var(--ml-muted);
+}
+
+.mtw-ml-gate__input:focus {
+  outline: none;
+  border-color: var(--ml-accent) !important;
+  box-shadow: 0 0 0 3px rgba(90, 176, 255, 0.2) !important;
+}
+
+.mtw-ml-gate__go {
+  display: block !important;
+  width: 100% !important;
+  flex: none !important;
+  height: 48px !important;
+  margin-top: 10px !important;
+  padding: 0 18px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: var(--ml-ink) !important;
+  color: #fff !important;
+  font-family: 'Manrope', system-ui, sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
+  text-align: center;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.mtw-ml-gate__go:hover { background: #000 !important; }
+.mtw-ml-gate__go:focus-visible { outline: 3px solid var(--ml-accent); outline-offset: 2px; }
+.mtw-ml-gate__go:disabled { opacity: .6; cursor: default; }
+
+.mtw-ml-gate__note {
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ml-muted);
+  min-height: 18px;
+  text-align: center;
+}
+
+.mtw-ml-gate__note.is-bad { color: #b42318; }
 
 /* A drawing that failed every retry. Hidden rather than left broken - some
    browsers draw a torn-image placeholder, which reads as part of the trailer.

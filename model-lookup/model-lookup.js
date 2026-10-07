@@ -151,6 +151,37 @@
     /* Used when csvSource is 'url', and as the fallback if the Firebase route fails. */
     csvUrl: 'https://raw.githack.com/Mikes-Transport/mtw-website-external/main/model-lookup/data/rego_search.csv',
 
+    /* --- access gate ---------------------------------------------------
+
+       The widget is hidden until a code is entered. The code is checked against
+       the `model-access` Firestore collection.
+
+       WHAT THIS DOES AND DOES NOT DO. It keeps the widget off casual traffic,
+       and it is the only thing in front of the widget. It is NOT how the data
+       is protected: the CSV is a separate, already-public file with
+       Access-Control-Allow-Origin: *, and this gate does not touch it. Nor is
+       the collection itself private - see verifyAccess(), which reads every
+       document in it. Real access control lives in Firestore security rules,
+       which is a server-side decision this code cannot make for itself. */
+
+    access: {
+      enabled: true,
+      collection: 'model-access',
+      /* Where "signed in for this tab" is remembered. sessionStorage dies with
+         the tab, which is the behaviour asked for - no logout until the tab or
+         browser closes. It is readable and writable by anything on the page,
+         so it is a convenience, not a credential. */
+      storageKey: 'mtw-ml-access',
+      title: 'Model lookup',
+      prompt: 'Enter your access code',
+      /* Shown on a wrong code. Deliberately says nothing about whether a code
+         exists, so the form cannot be used to discover them. */
+      invalid: "That code isn't recognised. Check it and try again.",
+      error: "Couldn't check your code just now. Please try again.",
+      submit: 'Unlock',
+      length: 4
+    },
+
     shopOrigin: 'https://www.mtw.co.nz',
 
     /* Retries when a drawing fails to load. raw.githack is a third-party service in
@@ -2085,6 +2116,174 @@
 
   /* --- boot ------------------------------------------------------------- */
 
+  /* --- access gate -------------------------------------------------------- */
+
+  /* Reads the `model-access` collection and decides whether the entered code
+     is in it.
+
+     This walks every document in the collection, which means the whole set of
+     codes arrives in the browser in plaintext. That is the honest consequence
+     of the approach as specified, and it is the one thing worth being clear
+     about: this function is the gate in front of the WIDGET, not a protection
+     on the collection. Anyone who opens the network panel while this runs sees
+     every code there is.
+
+     Firestore security rules are the only thing that can change that, and they
+     are enforced by Google rather than by this code - so tightening them later
+     is a rules change, not a rewrite of anything here. */
+  function verifyAccess(code) {
+    var f = cfg.firebase;
+    var want = String(code || '').trim();
+
+    /* The REST list endpoint. The SDK is not used because it would mean the
+       page has to initialise Firebase first, and the drawer already does its
+       own thing - this keeps the gate self-contained. */
+    /* projectId is nested under config, not at the top of firebase - reading
+       f.project gives undefined and the request goes out as
+       "projects/undefined", which Firestore answers with a bare 403 and no
+       explanation. Same source the CSV-link read uses. */
+    var projectId = f.config && f.config.projectId;
+    if (!projectId) return Promise.reject(new Error('firebase.config.projectId is not set'));
+
+    var base = f.api + '/' + projectId + '/databases/(default)/documents/' +
+               encodeURIComponent(cfg.access.collection);
+
+    return getJson(base + '?pageSize=300').then(function (page) {
+      var docs = (page && page.documents) || [];
+
+      for (var i = 0; i < docs.length; i++) {
+        var fields = docs[i].fields || {};
+
+        /* The code can live under any of these. Firestore wraps strings, and
+           the document id is often the code itself, so all three are checked
+           rather than assuming one shape. */
+        var candidates = [
+          docId(docs[i]),
+          str(fields.code),
+          str(fields.access_code),
+          str(fields.accessCode),
+          str(fields.pin)
+        ];
+
+        for (var j = 0; j < candidates.length; j++) {
+          if (candidates[j] && normaliseCode(candidates[j]) === normaliseCode(want)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+  }
+
+  function docId(doc) {
+    /* "projects/p/databases/(default)/documents/model-access/1234" -> "1234" */
+    var parts = String(doc && doc.name || '').split('/');
+    return parts[parts.length - 1] || '';
+  }
+
+  function str(field) {
+    if (!field) return null;
+    if (field.stringValue != null) return field.stringValue;
+    if (field.integerValue != null) return String(field.integerValue);
+    if (field.doubleValue != null) return String(field.doubleValue);
+    return null;
+  }
+
+  /* Leading zeros matter on a numeric code, so this trims characters rather
+     than parsing - "0123" must not become "123". */
+  function normaliseCode(v) {
+    return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  function accessGranted() {
+    try { return window.sessionStorage.getItem(cfg.access.storageKey) === '1'; }
+    catch (e) { return false; }
+  }
+
+  function rememberAccess() {
+    try { window.sessionStorage.setItem(cfg.access.storageKey, '1'); } catch (e) {}
+  }
+
+  /* The login form. Deliberately the only thing on the page until a code is
+     accepted - the CSV is not fetched and the widget is not built until then,
+     so nothing is in the DOM or in memory to look at. */
+  function renderGate(host, onGranted) {
+    var a = cfg.access;
+    clear(host);
+
+    var box = el('div', 'mtw-ml-gate');
+    box.appendChild(el('h2', 'mtw-ml-gate__title', a.title));
+
+    var form = el('form', 'mtw-ml-gate__form');
+    form.setAttribute('role', 'search');
+    form.noValidate = true;
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'mtw-ml-gate__input';
+    input.placeholder = a.prompt;
+    input.maxLength = a.length;
+    input.autocomplete = 'off';
+    input.setAttribute('inputmode', 'numeric');
+    input.setAttribute('aria-label', a.prompt);
+    form.appendChild(input);
+
+    var go = el('button', 'mtw-ml-gate__go', a.submit);
+    go.type = 'submit';
+    /* Inside the form, not beside it in the DOM. A submit button that sits
+       outside its own form does not submit it, so moving it out to get the
+       layout silently broke clicking it. The stacking is done in CSS instead. */
+    form.appendChild(go);
+    box.appendChild(form);
+
+    var note = el('p', 'mtw-ml-gate__note');
+    note.setAttribute('role', 'status');
+    box.appendChild(note);
+    host.appendChild(box);
+
+    /* Enter submits the form, and so does the button. Both go through here. */
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var code = input.value.trim();
+      if (!code) { input.focus(); return; }
+
+      input.disabled = true;
+      go.disabled = true;
+      go.textContent = 'Checking…';
+      note.textContent = '';
+
+      verifyAccess(code).then(function (ok) {
+        if (ok) {
+          rememberAccess();
+          clear(host);
+          onGranted();
+          return;
+        }
+        /* Same message either way, so a wrong code cannot be used to find out
+           which codes exist. */
+        note.textContent = a.invalid;
+        note.className = 'mtw-ml-gate__note is-bad';
+        input.value = '';
+        input.disabled = false;
+        go.disabled = false;
+        go.textContent = a.submit;
+        input.focus();
+      }, function (err) {
+        /* Fails closed. A Firestore error must not wave the widget through.
+           The reason is logged - a gate that swallows its own error is
+           impossible to debug from the page it is protecting. */
+        warn('access check failed:', err && err.message ? err.message : err);
+        note.textContent = a.error;
+        note.className = 'mtw-ml-gate__note is-bad';
+        input.disabled = false;
+        go.disabled = false;
+        go.textContent = a.submit;
+      });
+    });
+
+    input.focus();
+  }
+
   function mount() {
     var host = document.querySelector(cfg.mount);
     if (!host) { warn('no mount point for', cfg.mount); return; }
@@ -2093,6 +2292,18 @@
 
     loadCss();
     loadFonts();
+
+    /* The gate comes before anything is built or fetched. */
+    if (cfg.access.enabled && !accessGranted()) {
+      renderGate(host, function () { buildWidget(host); });
+      return;
+    }
+
+    buildWidget(host);
+  }
+
+  function buildWidget(host) {
+    clear(host);
 
     var box = el('div', 'mtw-ml' + (cfg.hotspots ? '' : ' mtw-ml--no-hotspots'));
     host.appendChild(box);
